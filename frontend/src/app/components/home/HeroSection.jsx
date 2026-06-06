@@ -69,14 +69,13 @@ export default function HeroSection() {
     // APPLYING THE ANIMATION HERE:
     // This matches: initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
     <section
-      className={`bg-[#FAF9F6] pt-32 pb-20 px-8 min-h-[100vh] relative transition-all duration-700 ease-in-out ${
-        isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-      }`}
+      className={`bg-[#FAF9F6] pt-32 pb-20 px-8 min-h-[100vh] relative transition-all duration-700 ease-in-out ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+        }`}
     >
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
         {/* Left Column - Text Content */}
         <div className="space-y-6">
-          <h1 className="font-[family-name:var(--font-montserrat)] text-[clamp(3rem,4vw,4.5rem)] font-extrabold leading-tight bg-gradient-to-r from-[#122361] to-[#2f84c0] bg-clip-text text-transparent">
+          <h1 className="font-[family-name:var(--font-montserrat)] text-[clamp(1.8rem,3.5vw,4.5rem)] font-extrabold leading-tight bg-gradient-to-r from-[#122361] to-[#2f84c0] bg-clip-text text-transparent">
             <span className="block whitespace-nowrap">Streamlined</span>
             <span className="block whitespace-nowrap">Document Requests</span>
             <span className="block whitespace-nowrap">for Every Residents</span>
@@ -140,9 +139,8 @@ export default function HeroSection() {
               <Image
                 src="/documents/certificate-of-indigency.png"
                 alt="Certificate of Indigency"
-                className={`w-[220px] md:w-[260px] -mr-35 rounded-xl shadow-sm z-10 transition-all duration-700 ease-in-out hover:scale-105 ${
-                  showImg1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-                }`}
+                className={`w-[220px] md:w-[260px] -mr-35 rounded-xl shadow-sm z-10 transition-all duration-700 ease-in-out hover:scale-105 ${showImg1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+                  }`}
                 width={260}
                 height={340}
               />
@@ -150,9 +148,8 @@ export default function HeroSection() {
               <Image
                 src="/documents/first-time-jobseeker.png"
                 alt="First Time Job Seeker"
-                className={`w-[260px] md:w-[300px] -mr-35 rounded-xl shadow-sm z-20 transition-all duration-700 ease-in-out hover:scale-105 ${
-                  showImg2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-                }`}
+                className={`w-[260px] md:w-[300px] -mr-35 rounded-xl shadow-sm z-20 transition-all duration-700 ease-in-out hover:scale-105 ${showImg2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+                  }`}
                 width={300}
                 height={380}
               />
@@ -160,9 +157,8 @@ export default function HeroSection() {
               <Image
                 src="/documents/barangay-clearance.png"
                 alt="Barangay Clearance"
-                className={`w-[300px] md:w-[360px] rounded-xl shadow-sm z-30 transition-all duration-700 ease-in-out hover:scale-105 ${
-                  showImg3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-                }`}
+                className={`w-[300px] md:w-[360px] rounded-xl shadow-sm z-30 transition-all duration-700 ease-in-out hover:scale-105 ${showImg3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+                  }`}
                 width={360}
                 height={440}
                 priority
