@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -320,7 +321,7 @@ export default function AdminDocumentsPage({ disableEntranceAnimation = false } 
   const fetchDocuments = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8080/api/document-types', {
+      const response = await fetch(`${API_BASE_URL}/api/document-types`, {
         headers: token ? {
           Authorization: `Bearer ${token}`,
         } : {},
@@ -369,7 +370,7 @@ export default function AdminDocumentsPage({ disableEntranceAnimation = false } 
       setDeleteError('');
       const token = localStorage.getItem('token');
 
-      const verifyResponse = await fetch('http://localhost:8080/api/superadmin/verify-password', {
+      const verifyResponse = await fetch(`${API_BASE_URL}/api/superadmin/verify-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -389,7 +390,7 @@ export default function AdminDocumentsPage({ disableEntranceAnimation = false } 
         return;
       }
 
-      const response = await fetch(`http://localhost:8080/api/document-types/${deleteTarget.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/document-types/${deleteTarget.id}`, {
         method: 'DELETE',
         headers: token ? {
           Authorization: `Bearer ${token}`,

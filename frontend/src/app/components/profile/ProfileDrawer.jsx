@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -221,7 +222,7 @@ export default function ProfileDrawer({ isOpen, onClose, user, role }) {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8080/api/auth/profile', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

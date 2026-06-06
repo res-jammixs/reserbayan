@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -270,7 +271,7 @@ export default function RequestFormModal({ user, onClose, onSuccess }) {
       formDataToSend.append('data', JSON.stringify(dataPayload));
       selectedFiles.forEach((file) => formDataToSend.append('files', file));
 
-      const response = await fetch('http://localhost:8080/api/document-requests', {
+      const response = await fetch(`${API_BASE_URL}/api/document-requests`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

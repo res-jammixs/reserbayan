@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Mail, Phone, MapPin, Calendar, CheckCircle, XCircle, Clock, Loader2, Eye } from 'lucide-react';
@@ -36,16 +37,16 @@ export default function PendingAccountDetailsModal({
     // If it's a Windows absolute path, extract just the filename
     if (path.includes('\\') || path.includes('C:')) {
       const fileName = path.split('\\').pop().split('/').pop();
-      return `http://localhost:8080/uploads/resident/${fileName}`;
+      return `${API_BASE_URL}/uploads/resident/${fileName}`;
     }
     
     // If it's a relative path, prepend the backend URL
     if (path.startsWith('uploads/')) {
-      return `http://localhost:8080/${path}`;
+      return `${API_BASE_URL}/${path}`;
     }
     
     // Default: assume it's just a filename in the uploads directory
-    return `http://localhost:8080/uploads/resident/${path}`;
+    return `${API_BASE_URL}/uploads/resident/${path}`;
   };
 
   // Utility function to check if file is an image (PNG, JPG, JPEG only)

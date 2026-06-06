@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
@@ -32,7 +33,7 @@ export default function RequestDetailsModal({
       
       // Fetch the full request details including attachments
       const response = await fetch(
-        `http://localhost:8080/api/document-requests/${requestDetails.requestId}`,
+        `${API_BASE_URL}/api/document-requests/${requestDetails.requestId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -64,7 +65,7 @@ export default function RequestDetailsModal({
       }
 
       const response = await fetch(
-        `http://localhost:8080/api/document-requests/${requestDetails.requestId}/attachments/${file.id}/download`,
+        `${API_BASE_URL}/api/document-requests/${requestDetails.requestId}/attachments/${file.id}/download`,
         {
           headers: {
             'Authorization': `Bearer ${token}`

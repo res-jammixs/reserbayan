@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
@@ -62,7 +63,7 @@ export default function DashboardPage() {
         return;
       }
       
-      const response = await fetch('http://localhost:8080/api/residents/announcements', {
+      const response = await fetch(`${API_BASE_URL}/api/residents/announcements`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

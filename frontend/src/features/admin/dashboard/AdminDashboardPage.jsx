@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,7 +9,7 @@ import RejectionReasonModal from '@/shared/components/modals/RejectionReasonModa
 import { getResponseErrorMessage, getStoredJson } from '@/shared/lib/api';
 
 export default function AdminDashboardPage({
-  apiBase = 'http://localhost:8080/api/admin',
+  apiBase = `${API_BASE_URL}/api/admin`,
   basePath = 'admin',
   allowedRoles = ['ADMIN', 'SUPER_ADMIN'],
   redirectForRole = {},

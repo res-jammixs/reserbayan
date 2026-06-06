@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -258,7 +259,7 @@ export function RequestDrawerProvider({ children }) {
       formDataToSend.append('data', JSON.stringify(dataPayload));
       draft.files.forEach((file) => formDataToSend.append('files', file));
 
-      const response = await fetch('http://localhost:8080/api/document-requests', {
+      const response = await fetch(`${API_BASE_URL}/api/document-requests`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

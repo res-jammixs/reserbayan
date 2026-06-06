@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -30,7 +31,7 @@ export default function AnnouncementsPage() {
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
 
   // API base URL
-  const API_BASE = 'http://localhost:8080/api/residents';
+  const API_BASE = `${API_BASE_URL}/api/residents`;
 
   // Show notification helper
   const showNotification = (message, type = 'success') => {

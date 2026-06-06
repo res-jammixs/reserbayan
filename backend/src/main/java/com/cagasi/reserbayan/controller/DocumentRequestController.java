@@ -124,7 +124,7 @@ public class DocumentRequestController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
 
-            Optional<DocumentRequest> requestOpt = documentRequestRepository.findById(id);
+            Optional<DocumentRequest> requestOpt = documentRequestRepository.findByRequestId(id);
             if (requestOpt.isEmpty()) {
                 return ResponseEntity.notFound().build();
             }
@@ -509,10 +509,9 @@ public class DocumentRequestController {
         }
 
         // Set attachments
-        List<RequestAttachment> attachments = requestAttachmentRepository
-                .findByDocumentRequest_RequestId(request.getRequestId());
-        dto.setAttachments(attachments.stream().map(this::convertAttachmentToDTO).toList());
-        dto.setAttachmentCount(attachments.size());
+        List<RequestAttachment> attachments = request.getAttachments();
+        dto.setAttachments(attachments != null ? attachments.stream().map(this::convertAttachmentToDTO).toList() : List.of());
+        dto.setAttachmentCount(attachments != null ? attachments.size() : 0);
 
         return dto;
     }

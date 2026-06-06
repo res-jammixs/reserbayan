@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -435,7 +436,7 @@ function StatCard({ label, value, icon: Icon }) {
   );
 }
 
-export default function AnnouncementsManagement({ apiBase = 'http://localhost:8080/api/superadmin', roleLabel = 'Announcements'}) {
+export default function AnnouncementsManagement({ apiBase = `${API_BASE_URL}/api/superadmin`, roleLabel = 'Announcements'}) {
   const API_BASE = apiBase;
 
   const router = useRouter();

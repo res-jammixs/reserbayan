@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import Image from 'next/image';
 import Link from 'next/link';
@@ -47,8 +48,8 @@ function getImageSource(imagePath) {
   const normalizedPath = imagePath.replace(/\\/g, '/');
 
   if (normalizedPath.startsWith('http')) return normalizedPath;
-  if (normalizedPath.startsWith('/uploads/')) return `http://localhost:8080${normalizedPath}`;
-  if (normalizedPath.startsWith('uploads/')) return `http://localhost:8080/${normalizedPath}`;
+  if (normalizedPath.startsWith('/uploads/')) return `${API_BASE_URL}${normalizedPath}`;
+  if (normalizedPath.startsWith('uploads/')) return `${API_BASE_URL}/${normalizedPath}`;
 
   return normalizedPath;
 }
@@ -224,7 +225,7 @@ function AdminDocumentDetailContent() {
     const fetchDocument = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:8080/api/document-types/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/document-types/${id}`, {
           headers: token ? {
             Authorization: `Bearer ${token}`,
           } : {},
@@ -273,7 +274,7 @@ function AdminDocumentDetailContent() {
     uploadPayload.append('file', file);
 
     const token = localStorage.getItem('token');
-    const response = await fetch('http://localhost:8080/api/document-types/upload', {
+    const response = await fetch(`${API_BASE_URL}/api/document-types/upload`, {
       method: 'POST',
       body: uploadPayload,
       ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
@@ -414,7 +415,7 @@ function AdminDocumentDetailContent() {
         },
       };
 
-      const response = await fetch(`http://localhost:8080/api/document-types/${documentTypeId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/document-types/${documentTypeId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -457,7 +458,7 @@ function AdminDocumentDetailContent() {
       setDeleteError('');
       const token = localStorage.getItem('token');
 
-      const verifyResponse = await fetch('http://localhost:8080/api/superadmin/verify-password', {
+      const verifyResponse = await fetch(`${API_BASE_URL}/api/superadmin/verify-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -477,7 +478,7 @@ function AdminDocumentDetailContent() {
         return;
       }
 
-      const response = await fetch(`http://localhost:8080/api/document-types/${documentTypeId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/document-types/${documentTypeId}`, {
         method: 'DELETE',
         headers: token ? {
           Authorization: `Bearer ${token}`,

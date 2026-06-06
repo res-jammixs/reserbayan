@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -322,7 +323,7 @@ export default function AddDocumentModalPage({
     uploadFormData.append('file', file);
 
     const token = localStorage.getItem('token');
-    const response = await fetch('http://localhost:8080/api/document-types/upload', {
+    const response = await fetch(`${API_BASE_URL}/api/document-types/upload`, {
       method: 'POST',
       body: uploadFormData,
       ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
@@ -372,7 +373,7 @@ export default function AddDocumentModalPage({
         },
       };
 
-      const response = await fetch('http://localhost:8080/api/document-types', {
+      const response = await fetch(`${API_BASE_URL}/api/document-types`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

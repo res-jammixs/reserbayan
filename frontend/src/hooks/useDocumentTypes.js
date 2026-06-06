@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/lib/api';
 import { useState, useEffect } from 'react';
 
 export function useDocumentTypes() {
@@ -8,7 +9,7 @@ export function useDocumentTypes() {
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/document-types');
+        const response = await fetch(`${API_BASE_URL}/api/document-types`);
         if (!response.ok) {
           throw new Error('Failed to fetch documents');
         }

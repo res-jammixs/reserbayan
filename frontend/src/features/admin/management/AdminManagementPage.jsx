@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -177,7 +178,7 @@ function AdminManagementContent({ variant = 'superadmin' }) {
   const config = managementRoleConfigs[variant] || managementRoleConfigs.superadmin;
   const { allowedRoles, allowedTabs, basePath, defaultTab, redirectForRole } = config;
   const routeBase = `/${basePath}/management`;
-  const apiBase = `http://localhost:8080/api/${basePath}`;
+  const apiBase = `${API_BASE_URL}/api/${basePath}`;
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState(null);
@@ -669,7 +670,7 @@ function AdminManagementContent({ variant = 'superadmin' }) {
     if (activeTab === 'document-requests') {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:8080/api/document-requests/${resident.requestId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/document-requests/${resident.requestId}`, {
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         });
 

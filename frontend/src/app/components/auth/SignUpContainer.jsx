@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
@@ -454,7 +455,7 @@ export default function SignUpContainer({ onClose }) {
 
     if (activeTab === 'login') {
       try {
-        const response = await fetch("http://localhost:8080/api/auth/login", {
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
@@ -533,7 +534,7 @@ export default function SignUpContainer({ onClose }) {
       if (employmentFile) formData.append('validId', employmentFile);
 
       try {
-        const response = await fetch('http://localhost:8080/api/auth/register', {
+        const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
           method: 'POST',
           body: formData,
         });

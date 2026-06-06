@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import Image from 'next/image';
 import { notFound, useRouter, useSearchParams } from 'next/navigation';
@@ -54,7 +55,7 @@ function DocumentDetailContent({ params }) {
   const requirements = doc.details?.requirements || [];
   const uses = doc.details?.uses || [];
   const imageSource = doc.imagePath.startsWith('/uploads/')
-    ? `http://localhost:8080${doc.imagePath}`
+    ? `${API_BASE_URL}${doc.imagePath}`
     : doc.imagePath;
 
   const handleRequestDocument = () => {

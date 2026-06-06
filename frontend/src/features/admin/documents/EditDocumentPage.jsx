@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE_URL } from '@/lib/api';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
@@ -40,7 +41,7 @@ export default function EditDocumentPage({ basePath = '/admin' }) {
     formData.append('file', file);
 
     const token = localStorage.getItem('token');
-    const response = await fetch('http://localhost:8080/api/document-types/upload', {
+    const response = await fetch(`${API_BASE_URL}/api/document-types/upload`, {
       method: 'POST',
       body: formData,
       ...(token ? { headers: { 'Authorization': `Bearer ${token}` } } : {})
@@ -53,7 +54,7 @@ export default function EditDocumentPage({ basePath = '/admin' }) {
   const fetchDocument = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8080/api/document-types/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/document-types/${id}`, {
         headers: token ? {
           'Authorization': `Bearer ${token}`,
         } : {},
@@ -136,7 +137,7 @@ export default function EditDocumentPage({ basePath = '/admin' }) {
         }
       };
 
-      const response = await fetch(`http://localhost:8080/api/document-types/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/document-types/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

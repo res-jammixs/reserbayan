@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/lib/api';
 import { useState } from 'react';
 import { X, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -190,7 +191,7 @@ export default function AccountActivityModal({ isOpen, onClose, user, onResubmit
           // Handle resubmission
           try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:8080/api/auth/resubmit', {
+            const response = await fetch(`${API_BASE_URL}/api/auth/resubmit`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`,

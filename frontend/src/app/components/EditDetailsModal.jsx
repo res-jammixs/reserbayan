@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { X, Users, Mail, Phone, MapPin, Calendar, FileText, Eye, EyeOff, Upload, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -40,7 +41,7 @@ export default function EditDetailsModal({ isOpen, onClose, resident, onSubmit }
         sitio: resident.sitio || '',
         addressLine1: resident.addressLine1 || ''
       });
-      setCurrentFileUrl(resident.validIdPath ? `http://localhost:8080/${resident.validIdPath.replace(/\\/g, '/')}` : '');
+      setCurrentFileUrl(resident.validIdPath ? `${API_BASE_URL}/${resident.validIdPath.replace(/\\/g, '/')}` : '');
       setSelectedFile(null);
     }
   }, [resident, isOpen]);
