@@ -8,6 +8,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -42,6 +43,9 @@ public class AuthService {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Value("${app.upload.dir:uploads}")
+    private String uploadDir;
+
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(
             "^(?=.*[A-Z])(?=.*\\d)(?=.*[^A-Za-z0-9\\s])[A-Za-z0-9\\S]{8,}$");
 
@@ -64,15 +68,14 @@ public class AuthService {
         admin.setPassword(passwordEncoder.encode(admin.getPassword()));
 
         if (proofOfEmployment != null && !proofOfEmployment.isEmpty()) {
-            String uploadDir = "uploads/admin/";
-            Path uploadPath = Paths.get(uploadDir);
+            Path uploadPath = uploadPath("admin");
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
-            String fileName = UUID.randomUUID().toString() + "_" + proofOfEmployment.getOriginalFilename();
+            String fileName = createStoredFileName(proofOfEmployment.getOriginalFilename());
             Path filePath = uploadPath.resolve(fileName);
             Files.copy(proofOfEmployment.getInputStream(), filePath);
-            admin.setProofOfEmploymentPath(filePath.toString());
+            admin.setProofOfEmploymentPath("uploads/admin/" + fileName);
         }
 
         return adminRepository.save(admin);
@@ -123,12 +126,11 @@ public class AuthService {
                         "Invalid file type. Only image files (PNG, JPG, JPEG) are allowed for valid ID.");
             }
 
-            String uploadDir = System.getProperty("user.dir") + "/uploads/resident/";
-            Path uploadPath = Paths.get(uploadDir);
+            Path uploadPath = uploadPath("resident");
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
-            String fileName = UUID.randomUUID().toString() + "_" + validId.getOriginalFilename();
+            String fileName = createStoredFileName(validId.getOriginalFilename());
             Path filePath = uploadPath.resolve(fileName);
             Files.copy(validId.getInputStream(), filePath);
             // Store relative path for web access, not absolute path
@@ -136,6 +138,18 @@ public class AuthService {
         }
 
         return residentRepository.save(resident);
+    }
+
+    private Path uploadPath(String folder) {
+        return Paths.get(uploadDir).toAbsolutePath().normalize().resolve(folder);
+    }
+
+    private String createStoredFileName(String originalFilename) {
+        String safeName = originalFilename == null || originalFilename.isBlank()
+                ? "upload"
+                : Paths.get(originalFilename).getFileName().toString();
+        safeName = safeName.replaceAll("[^A-Za-z0-9._-]", "_");
+        return UUID.randomUUID() + "_" + safeName;
     }
 
     // ... authenticate methods remain the same ...

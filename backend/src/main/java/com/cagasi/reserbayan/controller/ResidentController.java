@@ -37,9 +37,9 @@ public class ResidentController {
                 announcements = announcementService.getAllActiveAnnouncements();
             }
 
-            // Apply visibility filter (only visible announcements for residents)
+            // Only currently visible announcements should be shown to residents.
             announcements = announcements.stream()
-                    .filter(announcement -> announcement.getIsVisible() != null && announcement.getIsVisible())
+                    .filter(announcementService::isVisibleToResidents)
                     .collect(Collectors.toList());
 
             // Sort by created date (newest first) and priority
@@ -88,9 +88,7 @@ public class ResidentController {
         try {
             return announcementService.getAnnouncementById(id)
                     .map(announcement -> {
-                        // Only return active and visible announcements to residents
-                        if (announcement.getIsActive() != null && announcement.getIsActive() &&
-                                announcement.getIsVisible() != null && announcement.getIsVisible()) {
+                        if (announcementService.isVisibleToResidents(announcement)) {
                             return ResponseEntity.ok(new AnnouncementDTO(announcement));
                         } else {
                             return ResponseEntity.notFound().build();
@@ -110,7 +108,7 @@ public class ResidentController {
         try {
             List<Announcement> announcements = announcementService.getAllActiveAnnouncements();
             long visibleCount = announcements.stream()
-                    .filter(announcement -> announcement.getIsVisible() != null && announcement.getIsVisible())
+                    .filter(announcementService::isVisibleToResidents)
                     .count();
             return ResponseEntity.ok(Map.of("count", visibleCount));
         } catch (Exception e) {

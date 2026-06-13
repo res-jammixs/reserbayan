@@ -9,6 +9,8 @@ public class DocumentTypeDTO {
     private String shortDescription;
     private String imagePath;
     private Details details;
+    private String recommendationReason;
+    private Integer recommendationScore;
 
     public static class Details {
         private String category;
@@ -115,5 +117,21 @@ public class DocumentTypeDTO {
 
     public void setDetails(Details details) {
         this.details = details;
+    }
+
+    public String getRecommendationReason() {
+        return recommendationReason;
+    }
+
+    public void setRecommendationReason(String recommendationReason) {
+        this.recommendationReason = recommendationReason;
+    }
+
+    public Integer getRecommendationScore() {
+        return recommendationScore;
+    }
+
+    public void setRecommendationScore(Integer recommendationScore) {
+        this.recommendationScore = recommendationScore;
     }
 }

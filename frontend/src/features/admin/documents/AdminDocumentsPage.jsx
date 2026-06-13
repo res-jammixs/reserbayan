@@ -8,6 +8,8 @@ import {
   BriefcaseBusiness,
   Building2,
   Check,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Clock3,
   Edit,
@@ -71,6 +73,7 @@ const timelineOptions = [
   { value: 'variable', label: 'Variable' },
 ];
 
+const DOCUMENTS_PER_PAGE = 9;
 const skipDocumentsAnimationKey = 'reserbayan:skip-documents-animation';
 
 function getCategoryConfig(category) {
@@ -141,7 +144,6 @@ function sortDocuments(documents, sortBy) {
 function DocumentIcon({ compact = false }) {
   return (
     <div className={`relative flex shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#13286F] to-[#1E88D3] text-white shadow-[0_8px_18px_rgba(36,59,142,0.12)] ${compact ? 'h-11 w-11' : 'h-12 w-12'}`}>
-      <div className="absolute inset-1 rounded-xl border border-white/20" />
       <FileBadge2 className={compact ? 'h-5 w-5' : 'h-6 w-6'} strokeWidth={1.8} />
     </div>
   );
@@ -244,7 +246,6 @@ function AdminDocumentCard({ doc, viewMode, onDelete, basePath, deleteMode }) {
       >
         <CategoryCornerBadge category={doc.details?.category} />
         
-
         <div className="relative z-10 shrink-0">
           <DocumentIcon />
         </div>
@@ -287,6 +288,70 @@ function AdminDocumentCard({ doc, viewMode, onDelete, basePath, deleteMode }) {
   );
 }
 
+function DocumentsPagination({ currentPage, totalPages, totalItems, onPageChange }) {
+  if (totalPages <= 1) {
+    return null;
+  }
+
+  const firstVisibleItem = (currentPage - 1) * DOCUMENTS_PER_PAGE + 1;
+  const lastVisibleItem = Math.min(currentPage * DOCUMENTS_PER_PAGE, totalItems);
+  const pages = Array.from({ length: totalPages }, (_, index) => index + 1)
+    .filter((page) => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1);
+
+  return (
+    <nav className="mt-5 flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white/90 p-3 shadow-[0_8px_20px_rgba(15,23,42,0.06)] sm:flex-row sm:items-center sm:justify-between" aria-label="Documents pagination">
+      <p className="px-2 text-sm font-semibold text-slate-500">
+        Showing <span className="text-[#122361]">{firstVisibleItem}-{lastVisibleItem}</span> of <span className="text-[#122361]">{totalItems}</span> documents
+      </p>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#122361] transition hover:border-[#9eaddd] hover:bg-[#eef3ff] disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Previous documents page"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+
+        {pages.map((page, index) => {
+          const previousPage = pages[index - 1];
+          const showGap = previousPage && page - previousPage > 1;
+
+          return (
+            <div key={page} className="flex items-center gap-2">
+              {showGap && <span className="text-sm font-bold text-slate-300">...</span>}
+              <button
+                type="button"
+                onClick={() => onPageChange(page)}
+                className={`h-10 min-w-10 rounded-2xl px-3 text-sm font-extrabold transition ${
+                  page === currentPage
+                    ? 'bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white shadow-[0_8px_18px_rgba(36,59,142,0.14)]'
+                    : 'border border-slate-200 bg-white text-slate-600 hover:border-[#9eaddd] hover:bg-[#eef3ff] hover:text-[#122361]'
+                }`}
+                aria-current={page === currentPage ? 'page' : undefined}
+              >
+                {page}
+              </button>
+            </div>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage === totalPages}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#122361] transition hover:border-[#9eaddd] hover:bg-[#eef3ff] disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Next documents page"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 export default function AdminDocumentsPage({ disableEntranceAnimation = false } = {}) {
   const pathname = usePathname();
   const isSuperAdmin = pathname?.startsWith('/superadmin');
@@ -301,6 +366,7 @@ export default function AdminDocumentsPage({ disableEntranceAnimation = false } 
   const [selectedTimeline, setSelectedTimeline] = useState('All');
   const [sortBy, setSortBy] = useState('recent');
   const [viewMode, setViewMode] = useState('grid');
+  const [currentPage, setCurrentPage] = useState(1);
   const [deleteMode, setDeleteMode] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletePassword, setDeletePassword] = useState('');
@@ -320,7 +386,7 @@ export default function AdminDocumentsPage({ disableEntranceAnimation = false } 
   const fetchDocuments = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8080/api/document-types', {
+      const response = await fetch('/api/document-types', {
         headers: token ? {
           Authorization: `Bearer ${token}`,
         } : {},
@@ -369,7 +435,7 @@ export default function AdminDocumentsPage({ disableEntranceAnimation = false } 
       setDeleteError('');
       const token = localStorage.getItem('token');
 
-      const verifyResponse = await fetch('http://localhost:8080/api/superadmin/verify-password', {
+      const verifyResponse = await fetch('/api/superadmin/verify-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -389,7 +455,7 @@ export default function AdminDocumentsPage({ disableEntranceAnimation = false } 
         return;
       }
 
-      const response = await fetch(`http://localhost:8080/api/document-types/${deleteTarget.id}`, {
+      const response = await fetch(`/api/document-types/${deleteTarget.id}`, {
         method: 'DELETE',
         headers: token ? {
           Authorization: `Bearer ${token}`,
@@ -437,6 +503,27 @@ export default function AdminDocumentsPage({ disableEntranceAnimation = false } 
 
     return sortDocuments(matchingDocuments, sortBy);
   }, [documentsData, searchQuery, selectedCategory, selectedTimeline, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / DOCUMENTS_PER_PAGE));
+  const paginatedDocuments = useMemo(() => {
+    const startIndex = (currentPage - 1) * DOCUMENTS_PER_PAGE;
+    return filteredDocuments.slice(startIndex, startIndex + DOCUMENTS_PER_PAGE);
+  }, [currentPage, filteredDocuments]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, selectedTimeline, sortBy]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 300, behavior: 'smooth' });
+    }
+  };
 
   if (loading) {
     return (
@@ -581,7 +668,7 @@ export default function AdminDocumentsPage({ disableEntranceAnimation = false } 
             animate={shouldAnimateEntrance ? { opacity: 1, y: 0 } : undefined}
             transition={shouldAnimateEntrance ? { duration: 0.4, delay: 0.1, ease: 'easeOut' } : undefined}
           >
-            {filteredDocuments.map((doc) => (
+            {paginatedDocuments.map((doc) => (
               <AdminDocumentCard
                 key={doc.id || doc.typeId}
                 doc={doc}
@@ -592,6 +679,15 @@ export default function AdminDocumentsPage({ disableEntranceAnimation = false } 
               />
             ))}
           </motion.div>
+        )}
+
+        {filteredDocuments.length > 0 && (
+          <DocumentsPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredDocuments.length}
+            onPageChange={handlePageChange}
+          />
         )}
       </div>
 

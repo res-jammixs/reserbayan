@@ -34,3 +34,26 @@ ReserBayan aims to reduce manual paperwork, long queues, and unclear request upd
 ```txt
 /frontend   Next.js application
 /backend    Spring Boot API
+```
+
+## Deployment Notes
+
+The Next.js frontend can be deployed on Vercel. The Spring Boot backend should be deployed separately on a host that can run Java and the native Tesseract OCR binary, such as Render, Railway, Fly.io, or a Docker-capable VPS.
+
+Frontend environment variables on Vercel:
+
+```txt
+BACKEND_URL=https://your-backend-domain.example.com
+```
+
+The frontend calls same-origin `/api/...` and `/uploads/...` paths. Next.js rewrites those paths to `BACKEND_URL`, so production does not depend on `localhost:8080`.
+
+Backend environment variables:
+
+```txt
+TESSERACT_COMMAND=tesseract
+DEEPSEEK_API_KEY=your_deepseek_api_key
+OCR_SPACE_API_KEY=your_ocr_space_api_key_optional
+```
+
+The backend uses online OCR by default, so local Tesseract is not required for development. The backend Dockerfile still installs `tesseract-ocr` as a fallback and sets `TESSERACT_COMMAND=tesseract` by default. If automatic checking is temporarily unavailable, uploads remain submittable and staff can review them manually.

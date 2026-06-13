@@ -11,8 +11,10 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -24,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.cagasi.reserbayan.dto.DocumentRequestDTO;
 import com.cagasi.reserbayan.dto.DocumentRequestUpdateDTO;
+import com.cagasi.reserbayan.dto.AiAttachmentMetadataDTO;
 import com.cagasi.reserbayan.entity.DocumentRequest;
 import com.cagasi.reserbayan.entity.DocumentType;
 import com.cagasi.reserbayan.entity.RequestAttachment;
@@ -37,12 +40,13 @@ import com.cagasi.reserbayan.repository.ResidentRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import com.cagasi.reserbayan.service.AdminNotificationService;
+import com.cagasi.reserbayan.service.AiRequirementAnalysisService;
 import com.cagasi.reserbayan.service.NotificationService;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
 @RequestMapping("/api/document-requests")
-@CrossOrigin(origins = { "http://localhost:3000", "http://localhost:3001", "http://localhost:3002" })
 public class DocumentRequestController {
 
     @Autowired
@@ -63,8 +67,11 @@ public class DocumentRequestController {
     @Autowired
     private NotificationService notificationService;
 
-    // Define the folder where files will be saved
-    private static final String UPLOAD_DIR = System.getProperty("user.dir") + "/uploads/";
+    @Autowired
+    private AiRequirementAnalysisService analysisService;
+
+    @Value("${app.upload.dir:uploads}")
+    private String uploadDir;
 
     @GetMapping
     public ResponseEntity<List<DocumentRequestDTO>> getAllDocumentRequests(HttpServletRequest request) {
@@ -141,6 +148,7 @@ public class DocumentRequestController {
     public ResponseEntity<?> createDocumentRequest(
             @RequestParam("data") String dataJson,
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
+            @RequestParam(value = "attachmentMetadata", required = false) String attachmentMetadataJson,
             HttpServletRequest request) {
         try {
             String authHeader = request.getHeader("Authorization");
@@ -175,11 +183,13 @@ public class DocumentRequestController {
                     savedRequest.getRequestId());
 
             // Handle file uploads
+            List<AiAttachmentMetadataDTO> attachmentMetadata = parseAttachmentMetadata(attachmentMetadataJson);
             if (files != null && !files.isEmpty()) {
-                for (MultipartFile file : files) {
+                for (int fileIndex = 0; fileIndex < files.size(); fileIndex++) {
+                    MultipartFile file = files.get(fileIndex);
                     if (!file.isEmpty()) {
-                        String filename = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-                        Path uploadPath = Paths.get(UPLOAD_DIR);
+                        String filename = createStoredFileName(file.getOriginalFilename());
+                        Path uploadPath = uploadPath();
 
                         if (!Files.exists(uploadPath)) {
                             Files.createDirectories(uploadPath);
@@ -194,10 +204,18 @@ public class DocumentRequestController {
                         attachment.setFileType(file.getContentType());
                         attachment.setFileSize(file.getSize());
                         attachment.setDocumentRequest(savedRequest);
+                        applyAttachmentMetadata(attachment, attachmentMetadata, fileIndex);
 
                         requestAttachmentRepository.save(attachment);
                     }
                 }
+            }
+
+            try {
+                analysisService.analyzeAndSave(savedRequest.getRequestId());
+            } catch (Exception analysisError) {
+                System.err.println("AI analysis failed for request " + savedRequest.getRequestId() + ": "
+                        + analysisError.getMessage());
             }
 
             DocumentRequestDTO savedDto = convertToDTO(savedRequest);
@@ -216,6 +234,7 @@ public class DocumentRequestController {
             @RequestParam("data") String dataJson,
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
             @RequestParam(value = "filesToRemove", required = false) List<Long> filesToRemove,
+            @RequestParam(value = "attachmentMetadata", required = false) String attachmentMetadataJson,
             HttpServletRequest request) {
         try {
             String authHeader = request.getHeader("Authorization");
@@ -238,7 +257,7 @@ public class DocumentRequestController {
                             .orElseThrow(() -> new RuntimeException("Attachment not found"));
 
                     // Delete physical file
-                    Path filePath = Paths.get(UPLOAD_DIR, attachment.getFilePath());
+                    Path filePath = uploadPath().resolve(attachment.getFilePath());
                     try {
                         Files.deleteIfExists(filePath);
                     } catch (IOException e) {
@@ -251,11 +270,13 @@ public class DocumentRequestController {
             }
 
             // Add new files
+            List<AiAttachmentMetadataDTO> attachmentMetadata = parseAttachmentMetadata(attachmentMetadataJson);
             if (files != null && !files.isEmpty()) {
-                for (MultipartFile file : files) {
+                for (int fileIndex = 0; fileIndex < files.size(); fileIndex++) {
+                    MultipartFile file = files.get(fileIndex);
                     if (!file.isEmpty()) {
-                        String filename = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-                        Path uploadPath = Paths.get(UPLOAD_DIR);
+                        String filename = createStoredFileName(file.getOriginalFilename());
+                        Path uploadPath = uploadPath();
 
                         if (!Files.exists(uploadPath)) {
                             Files.createDirectories(uploadPath);
@@ -270,6 +291,7 @@ public class DocumentRequestController {
                         attachment.setFileType(file.getContentType());
                         attachment.setFileSize(file.getSize());
                         attachment.setDocumentRequest(documentRequest);
+                        applyAttachmentMetadata(attachment, attachmentMetadata, fileIndex);
 
                         requestAttachmentRepository.save(attachment);
                     }
@@ -277,6 +299,12 @@ public class DocumentRequestController {
             }
 
             DocumentRequest savedRequest = documentRequestRepository.save(documentRequest);
+            try {
+                analysisService.analyzeAndSave(savedRequest.getRequestId());
+            } catch (Exception analysisError) {
+                System.err.println("AI analysis failed for request " + savedRequest.getRequestId() + ": "
+                        + analysisError.getMessage());
+            }
             adminNotificationService.createNotification(
                     "Document Request Updated",
                     savedRequest.getResident().getFirstName() + " " + savedRequest.getResident().getLastName()
@@ -332,7 +360,7 @@ public class DocumentRequestController {
             // authorization)
 
             // Load file
-            Path filePath = Paths.get(UPLOAD_DIR, attachment.getFilePath());
+            Path filePath = uploadPath().resolve(attachment.getFilePath());
             File file = filePath.toFile();
 
             if (!file.exists()) {
@@ -553,5 +581,42 @@ public class DocumentRequestController {
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse JSON data: " + e.getMessage());
         }
+    }
+
+    private List<AiAttachmentMetadataDTO> parseAttachmentMetadata(String attachmentMetadataJson) {
+        if (attachmentMetadataJson == null || attachmentMetadataJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            return objectMapper.readValue(attachmentMetadataJson, new TypeReference<List<AiAttachmentMetadataDTO>>() {
+            });
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    private void applyAttachmentMetadata(RequestAttachment attachment, List<AiAttachmentMetadataDTO> metadata,
+            int fileIndex) {
+        if (metadata == null || metadata.size() <= fileIndex) {
+            attachment.setUploadGroup("SUPPORTING");
+            return;
+        }
+        AiAttachmentMetadataDTO itemMetadata = metadata.get(fileIndex);
+        attachment.setUploadGroup(itemMetadata.getUploadGroup() != null ? itemMetadata.getUploadGroup() : "SUPPORTING");
+        attachment.setRequirementIndex(itemMetadata.getRequirementIndex());
+        attachment.setRequirementLabel(itemMetadata.getRequirementLabel());
+    }
+
+    private Path uploadPath() {
+        return Paths.get(uploadDir).toAbsolutePath().normalize();
+    }
+
+    private String createStoredFileName(String originalFilename) {
+        String safeName = originalFilename == null || originalFilename.isBlank()
+                ? "upload"
+                : Paths.get(originalFilename).getFileName().toString();
+        safeName = safeName.replaceAll("[^A-Za-z0-9._-]", "_");
+        return UUID.randomUUID() + "_" + safeName;
     }
 }

@@ -4,11 +4,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   ChevronRight,
   File,
-  FileCheck2,
   FileText,
   Mail,
   MapPin,
@@ -16,7 +16,6 @@ import {
   Paperclip,
   Phone,
   Send,
-  Sparkles,
   Trash2,
   Upload,
   UserRound,
@@ -25,6 +24,7 @@ import {
 import { useUser } from '@/contexts/UserContext';
 import ConfirmationModal from '@/app/components/ConfirmationModal';
 import NotificationModal from '@/app/components/NotificationModal';
+import MissingRequirementsConfirmModal from '@/app/components/requests/MissingRequirementsConfirmModal';
 
 const RequestDrawerContext = createContext(null);
 
@@ -56,16 +56,169 @@ const getFileSize = (size) => {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const getRequirementKey = (index) => `requirement-${index}`;
+
+const getDraftFileCount = (draft) => {
+  if (!draft) return 0;
+  const requirementCount = Object.values(draft.requirementFiles || {}).reduce((total, files) => total + files.length, 0);
+  return requirementCount + (draft.supportingFiles || []).length;
+};
+
+const getDraftRequirementFileCount = (draft) => {
+  if (!draft) return 0;
+  return Object.values(draft.requirementFiles || {}).reduce((total, files) => total + files.length, 0);
+};
+
+const buildRequestFiles = (draft) => {
+  const files = [];
+  const metadata = [];
+  const requirements = draft?.document?.details?.requirements || [];
+
+  requirements.forEach((requirement, index) => {
+    const slotFiles = draft.requirementFiles?.[getRequirementKey(index)] || [];
+    slotFiles.forEach((file) => {
+      files.push(file);
+      metadata.push({
+        uploadGroup: 'REQUIREMENT',
+        requirementIndex: index,
+        requirementLabel: requirement,
+        fileName: file.name,
+      });
+    });
+  });
+
+  (draft.supportingFiles || []).forEach((file) => {
+    files.push(file);
+    metadata.push({
+      uploadGroup: 'SUPPORTING',
+      requirementIndex: null,
+      requirementLabel: 'Other supporting files',
+      fileName: file.name,
+    });
+  });
+
+  return { files, metadata };
+};
+
+const getDraftFileSignature = (draft) => {
+  if (!draft?.document) return '';
+  const { files } = buildRequestFiles(draft);
+  if (files.length === 0) return '';
+  return [
+    draft.document.id,
+    ...(draft.document.details?.requirements || []),
+    ...files.map((file) => `${file.name}:${file.size}:${file.lastModified}`),
+  ].join('|');
+};
+
+const getRequirementFeedback = (requirementStatus, checking, hasFiles) => {
+  if (checking && hasFiles) {
+    return {
+      label: 'Checking document...',
+      className: 'border-[#d8def2] bg-[#eef3ff] text-[#122361]',
+      message: 'Reviewing this upload against the selected requirement.',
+    };
+  }
+
+  if (!requirementStatus) {
+    return hasFiles
+      ? {
+          label: 'Needs admin review',
+          className: 'border-amber-200 bg-amber-50 text-amber-700',
+          message: 'Upload added. This may still need staff review.',
+        }
+      : null;
+  }
+
+  if (requirementStatus.status === 'MATCHED') {
+    return {
+      label: 'Looks correct',
+      className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      message: requirementStatus.explanation || 'This document appears to match this requirement.',
+    };
+  }
+
+  if (requirementStatus.status === 'WRONG_DOCUMENT') {
+    return {
+      label: 'May not match',
+      className: 'border-red-200 bg-red-50 text-red-700',
+      message: requirementStatus.explanation || 'This may not match the required document.',
+    };
+  }
+
+  if (requirementStatus.status === 'OCR_UNAVAILABLE') {
+    return {
+      label: 'Needs staff review',
+      className: 'border-slate-200 bg-slate-50 text-slate-700',
+      message: requirementStatus.explanation || 'Automatic checking is temporarily unavailable. Staff can still review this manually.',
+    };
+  }
+
+  if (requirementStatus.status === 'UNREADABLE') {
+    return {
+      label: 'Unreadable',
+      className: 'border-red-200 bg-red-50 text-red-700',
+      message: requirementStatus.explanation || 'We could not clearly review this document. Please upload a clearer file if possible.',
+    };
+  }
+
+  return {
+    label: requirementStatus.status === 'MISSING' ? 'Missing' : 'Needs admin review',
+    className: 'border-amber-200 bg-amber-50 text-amber-700',
+    message: requirementStatus.explanation || 'Needs admin review.',
+  };
+};
+
+const getIdentityWarningsForFiles = (analysis, files) => {
+  const fileNames = new Set((files || []).map((file) => file.name));
+  if (fileNames.size === 0) return [];
+
+  const checks = (analysis?.identityChecks || [])
+    .filter((check) => fileNames.has(check.fileName))
+    .filter((check) => check.status && check.status !== 'MATCH');
+
+  if (checks.length === 0) return [];
+
+  if (checks.some((check) => check.status === 'MISMATCH')) {
+    return [{
+      status: 'MISMATCH',
+      message: 'Some details on this ID may not match your account information.',
+    }];
+  }
+
+  if (checks.some((check) => check.status === 'LOW_CONFIDENCE')) {
+    return [{
+      status: 'LOW_CONFIDENCE',
+      message: 'We could not confidently match this ID with your account information. Staff may review it.',
+    }];
+  }
+
+  return [{
+    status: 'NOT_VISIBLE',
+    message: 'We could not verify the ID details from this upload. Staff can review it manually.',
+  }];
+};
+
+const getIdentityWarningMessage = (check) => {
+  if (check.message) return check.message;
+  if (check.explanation) return check.explanation;
+  if (check.status === 'MISMATCH') return 'Some details on this ID may not match your account information.';
+  if (check.status === 'NOT_VISIBLE') return 'We could not verify the ID details from this upload. Staff can review it manually.';
+  return 'This ID needs staff review.';
+};
+
 export function RequestDrawerProvider({ children }) {
   const router = useRouter();
   const { user } = useUser();
   const fileInputRef = useRef(null);
+  const draftRef = useRef(null);
   const [draft, setDraft] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [pendingDocument, setPendingDocument] = useState(null);
   const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
+  const [showMissingRequirementsConfirm, setShowMissingRequirementsConfirm] = useState(false);
   const [notification, setNotification] = useState(null);
 
   const residentInfo = useMemo(() => ({
@@ -76,6 +229,10 @@ export function RequestDrawerProvider({ children }) {
   }), [user]);
 
   const hasDraft = Boolean(draft);
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
 
   useEffect(() => {
     if (!hasDraft) return undefined;
@@ -92,7 +249,10 @@ export function RequestDrawerProvider({ children }) {
   const createDraft = useCallback((document) => ({
     document,
     purpose: '',
-    files: [],
+    requirementFiles: {},
+    supportingFiles: [],
+    aiAnalysis: null,
+    aiDirty: false,
     createdAt: Date.now(),
   }), []);
 
@@ -154,24 +314,61 @@ export function RequestDrawerProvider({ children }) {
     setDraft((currentDraft) => currentDraft ? { ...currentDraft, purpose } : currentDraft);
   }, []);
 
-  const addFiles = useCallback((fileList) => {
+  const markAiDirty = useCallback((draftValue) => ({
+    ...draftValue,
+    aiDirty: Boolean(draftValue.aiAnalysis),
+  }), []);
+
+  const addSupportingFiles = useCallback((fileList) => {
     const files = Array.from(fileList || []);
     if (files.length === 0) return;
 
     setDraft((currentDraft) => currentDraft
-      ? { ...currentDraft, files: [...currentDraft.files, ...files] }
+      ? markAiDirty({ ...currentDraft, supportingFiles: [...(currentDraft.supportingFiles || []), ...files] })
       : currentDraft);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, []);
+  }, [markAiDirty]);
 
-  const removeFile = useCallback((indexToRemove) => {
+  const addRequirementFiles = useCallback((requirementIndex, fileList) => {
+    const files = Array.from(fileList || []);
+    if (files.length === 0) return;
+    const key = getRequirementKey(requirementIndex);
+
     setDraft((currentDraft) => currentDraft
-      ? { ...currentDraft, files: currentDraft.files.filter((_, index) => index !== indexToRemove) }
+      ? markAiDirty({
+          ...currentDraft,
+          requirementFiles: {
+            ...(currentDraft.requirementFiles || {}),
+            [key]: [...(currentDraft.requirementFiles?.[key] || []), ...files],
+          },
+        })
       : currentDraft);
-  }, []);
+  }, [markAiDirty]);
+
+  const removeSupportingFile = useCallback((indexToRemove) => {
+    setDraft((currentDraft) => currentDraft
+      ? markAiDirty({
+          ...currentDraft,
+          supportingFiles: (currentDraft.supportingFiles || []).filter((_, index) => index !== indexToRemove),
+        })
+      : currentDraft);
+  }, [markAiDirty]);
+
+  const removeRequirementFile = useCallback((requirementIndex, indexToRemove) => {
+    const key = getRequirementKey(requirementIndex);
+    setDraft((currentDraft) => currentDraft
+      ? markAiDirty({
+          ...currentDraft,
+          requirementFiles: {
+            ...(currentDraft.requirementFiles || {}),
+            [key]: (currentDraft.requirementFiles?.[key] || []).filter((_, index) => index !== indexToRemove),
+          },
+        })
+      : currentDraft);
+  }, [markAiDirty]);
 
   const minimizeRequest = useCallback(() => {
     setIsMinimized(true);
@@ -191,8 +388,92 @@ export function RequestDrawerProvider({ children }) {
     setSubmitting(false);
   }, []);
 
-  const submitRequest = useCallback(async (event) => {
-    event.preventDefault();
+  const runAiCheck = useCallback(async (draftToCheck = draftRef.current) => {
+    if (!draftToCheck?.document) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setNotification({
+        type: 'warning',
+        title: 'Login Required',
+        message: 'Please log in again to check the requirements.',
+      });
+      return;
+    }
+
+    setDraft((currentDraft) => currentDraft ? { ...currentDraft, aiChecking: true } : currentDraft);
+
+    try {
+      const { files, metadata } = buildRequestFiles(draftToCheck);
+      if (files.length === 0) {
+        setDraft((currentDraft) => currentDraft
+          ? { ...currentDraft, aiAnalysis: null, aiDirty: false, aiChecking: false }
+          : currentDraft);
+        return;
+      }
+      const payload = {
+        documentId: draftToCheck.document.id,
+        documentName: draftToCheck.document.name,
+        residentId: user?.residentId,
+        details: draftToCheck.purpose,
+      };
+      const formDataToSend = new FormData();
+      formDataToSend.append('data', JSON.stringify(payload));
+      files.forEach((file) => formDataToSend.append('files', file));
+      formDataToSend.append('attachmentMetadata', JSON.stringify(metadata));
+
+      const response = await fetch('/api/document-requests/ai/preview-check', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formDataToSend,
+      });
+
+      if (!response.ok) {
+        throw new Error('AI check unavailable');
+      }
+
+      const analysis = await response.json();
+      setDraft((currentDraft) => currentDraft
+        ? { ...currentDraft, aiAnalysis: analysis, aiDirty: false, aiChecking: false }
+        : currentDraft);
+    } catch (error) {
+      setDraft((currentDraft) => currentDraft
+        ? {
+            ...currentDraft,
+            aiAnalysis: {
+              overallStatus: 'ERROR',
+              summary: 'AI check is unavailable right now. You can still submit for manual review.',
+            },
+            aiDirty: false,
+            aiChecking: false,
+          }
+        : currentDraft);
+    }
+  }, [user?.residentId]);
+
+  const draftFileSignature = getDraftFileSignature(draft);
+
+  useEffect(() => {
+    if (draftFileSignature || (!draft?.aiAnalysis && !draft?.aiChecking)) return;
+    setDraft((currentDraft) => currentDraft
+      ? { ...currentDraft, aiAnalysis: null, aiDirty: false, aiChecking: false }
+      : currentDraft);
+  }, [draft?.aiAnalysis, draft?.aiChecking, draftFileSignature]);
+
+  useEffect(() => {
+    if (!draftFileSignature || submitting) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      runAiCheck(draftRef.current);
+    }, 650);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [draftFileSignature, runAiCheck, submitting]);
+
+  const submitRequest = useCallback(async (event, { skipMissingRequirementsPrompt = false } = {}) => {
+    event?.preventDefault();
 
     if (!draft?.document) return;
 
@@ -244,6 +525,12 @@ export function RequestDrawerProvider({ children }) {
       return;
     }
 
+    const requirements = draft.document?.details?.requirements || [];
+    if (!skipMissingRequirementsPrompt && requirements.length > 0 && getDraftRequirementFileCount(draft) === 0) {
+      setShowMissingRequirementsConfirm(true);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -256,9 +543,11 @@ export function RequestDrawerProvider({ children }) {
 
       const formDataToSend = new FormData();
       formDataToSend.append('data', JSON.stringify(dataPayload));
-      draft.files.forEach((file) => formDataToSend.append('files', file));
+      const { files, metadata } = buildRequestFiles(draft);
+      files.forEach((file) => formDataToSend.append('files', file));
+      formDataToSend.append('attachmentMetadata', JSON.stringify(metadata));
 
-      const response = await fetch('http://localhost:8080/api/document-requests', {
+      const response = await fetch('/api/document-requests', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -291,6 +580,11 @@ export function RequestDrawerProvider({ children }) {
     }
   }, [discardRequest, draft, router, user]);
 
+  const confirmSubmitWithoutRequirements = useCallback(() => {
+    setShowMissingRequirementsConfirm(false);
+    submitRequest(null, { skipMissingRequirementsPrompt: true });
+  }, [submitRequest]);
+
   const contextValue = useMemo(() => ({
     draft,
     hasDraft,
@@ -303,6 +597,7 @@ export function RequestDrawerProvider({ children }) {
   }), [discardRequest, draft, hasDraft, isMinimized, isOpen, minimizeRequest, restoreRequest, startRequest]);
 
   const requirements = draft?.document?.details?.requirements || [];
+  const draftFileCount = getDraftFileCount(draft);
 
   return (
     <RequestDrawerContext.Provider value={contextValue}>
@@ -310,8 +605,21 @@ export function RequestDrawerProvider({ children }) {
 
       <AnimatePresence>
         {isOpen && draft && (
+          <motion.div
+            className="fixed bottom-0 left-0 right-0 top-[73px] z-[44] bg-slate-950/30 backdrop-blur-[3px]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.24, ease: 'easeOut' }}
+            aria-hidden="true"
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isOpen && draft && (
           <motion.aside
-            className="fixed bottom-0 right-0 top-[73px] z-[45] flex w-full max-w-[480px] flex-col overflow-hidden border-l border-[#d8def2] bg-white shadow-[0_8px_20px_rgba(15,23,42,0.08)]"
+            className="fixed bottom-0 right-0 top-[73px] z-[45] flex w-full max-w-full flex-col overflow-hidden border-l border-[#d8def2] bg-white shadow-[0_8px_20px_rgba(15,23,42,0.08)] sm:max-w-[min(60vw,920px)]"
             initial={{ x: '100%', opacity: 0.7 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0.7 }}
@@ -353,137 +661,219 @@ export function RequestDrawerProvider({ children }) {
 
             <form onSubmit={submitRequest} className="flex min-h-0 flex-1 flex-col">
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[#FAFAFA] p-5">
-                <section className="overflow-hidden rounded-3xl border border-[#d8def2] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-extrabold uppercase tracking-wide text-[#243b8e]">Resident information</p>
-                      <p className="text-sm text-slate-500">Pulled from your account</p>
-                    </div>
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  </div>
-                  <div className="grid gap-2">
-                    {[
-                      { icon: UserRound, label: 'Name', value: residentInfo.fullName },
-                      { icon: Mail, label: 'Email', value: residentInfo.email },
-                      { icon: Phone, label: 'Phone', value: residentInfo.phone },
-                      { icon: MapPin, label: 'Address', value: residentInfo.address },
-                    ].map(({ icon: Icon, label, value }) => (
-                      <div key={label} className="flex min-w-0 gap-3 rounded-2xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
-                        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#243b8e]" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">{label}</p>
-                          <p className="whitespace-normal break-words text-sm font-bold leading-snug text-slate-700">{value}</p>
-                        </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <section className="overflow-hidden rounded-3xl border border-[#d8def2] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-extrabold uppercase tracking-wide text-[#243b8e]">Resident information</p>
+                        <p className="text-sm text-slate-500">Pulled from your account</p>
                       </div>
-                    ))}
-                  </div>
-                </section>
+                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                    </div>
+                    <div className="grid gap-2">
+                      {[
+                        { icon: UserRound, label: 'Name', value: residentInfo.fullName },
+                        { icon: Mail, label: 'Email', value: residentInfo.email },
+                        { icon: Phone, label: 'Phone', value: residentInfo.phone },
+                        { icon: MapPin, label: 'Address', value: residentInfo.address },
+                      ].map(({ icon: Icon, label, value }) => (
+                        <div key={label} className="flex min-w-0 gap-3 rounded-2xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100">
+                          <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#243b8e]" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-400">{label}</p>
+                            <p className="whitespace-normal break-words text-sm font-bold leading-snug text-slate-700">{value}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
 
-                <section className="rounded-3xl border border-[#d8def2] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
-                  <label htmlFor="request-purpose" className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
-                    <FileText className="h-4 w-4 text-[#243b8e]" />
-                    Purpose of request <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    id="request-purpose"
-                    value={draft.purpose}
-                    onChange={(event) => updatePurpose(event.target.value)}
-                    rows={5}
-                    placeholder="Example: For school enrollment, employment requirement, scholarship application..."
-                    className="mt-3 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-[#9eaddd] focus:bg-white focus:ring-4 focus:ring-[#d8def2]"
-                    required
-                  />
-                </section>
+                  <section className="flex min-h-full flex-col rounded-3xl border border-[#d8def2] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
+                    <label htmlFor="request-purpose" className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
+                      <FileText className="h-4 w-4 text-[#243b8e]" />
+                      Purpose of request <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      id="request-purpose"
+                      value={draft.purpose}
+                      onChange={(event) => updatePurpose(event.target.value)}
+                      rows={5}
+                      placeholder="Example: For school enrollment, employment requirement, scholarship application..."
+                      className="mt-3 min-h-[12rem] w-full flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-[#9eaddd] focus:bg-white focus:ring-4 focus:ring-[#d8def2]"
+                      required
+                    />
+                  </section>
+                </div>
 
                 <section className="rounded-3xl border border-[#d8def2] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
                         <Paperclip className="h-4 w-4 text-[#243b8e]" />
-                        Attachments
+                        Requirement uploads
                       </p>
-                      <p className="mt-1 text-xs font-medium text-slate-500">Upload IDs or supporting files if required.</p>
+                      <p className="mt-1 text-xs font-medium text-slate-500">Add files to the matching custom slot before submitting.</p>
                     </div>
                     <span className="rounded-full bg-[#eef3ff] px-2.5 py-1 text-xs font-extrabold text-[#122361] ring-1 ring-[#d8def2]">
-                      {draft.files.length} file{draft.files.length === 1 ? '' : 's'}
+                      {draftFileCount} file{draftFileCount === 1 ? '' : 's'}
                     </span>
                   </div>
 
-                  <div className="mt-3 rounded-2xl border border-dashed border-[#c2cbea] bg-[#eef3ff]/60 p-3">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      id="request-drawer-file-upload"
-                      multiple
-                      onChange={(event) => addFiles(event.target.files)}
-                      className="hidden"
-                    />
-                    <label
-                      htmlFor="request-drawer-file-upload"
-                      className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-extrabold text-[#122361] shadow-sm ring-1 ring-[#d8def2] transition hover:-translate-y-0.5 hover:shadow-sm"
-                    >
-                      <Upload className="h-4 w-4" />
-                      {draft.files.length > 0 ? 'Add more files' : 'Choose files'}
-                    </label>
-                  </div>
+                  <div className={requirements.length > 0 ? 'mt-3 grid gap-3 xl:grid-cols-2' : 'mt-3'}>
+                    {requirements.length > 0 ? (
+                      requirements.map((requirement, requirementIndex) => {
+                        const key = getRequirementKey(requirementIndex);
+                        const slotFiles = draft.requirementFiles?.[key] || [];
+                        const inputId = `request-drawer-${key}`;
+                        const requirementStatus = draft.aiAnalysis?.requirements?.find((item) => item.requirementIndex === requirementIndex);
+                        const feedback = getRequirementFeedback(requirementStatus, draft.aiChecking, slotFiles.length > 0);
+                        const identityWarnings = getIdentityWarningsForFiles(draft.aiAnalysis, slotFiles);
+                        const shouldSpanFullRow = requirements.length === 1
+                          || (requirements.length % 2 === 1 && requirementIndex === requirements.length - 1);
 
-                  {draft.files.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {draft.files.map((file, index) => (
-                        <div
-                          key={`${file.name}-${file.lastModified}-${index}`}
-                          className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200"
-                        >
-                          <div className="flex min-w-0 items-center gap-2">
-                            <File className="h-4 w-4 shrink-0 text-[#243b8e]" />
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-bold text-slate-700">{file.name}</p>
-                              <p className="text-xs font-medium text-slate-400">{getFileSize(file.size)}</p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeFile(index)}
-                            className="rounded-full p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-500"
-                            aria-label={`Remove ${file.name}`}
+                        return (
+                          <div
+                            key={`${requirement}-${requirementIndex}`}
+                            className={`rounded-2xl border border-slate-200 bg-slate-50/80 p-3 ${shouldSpanFullRow ? 'xl:col-span-2' : ''}`}
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-xs font-extrabold uppercase tracking-wide text-[#243b8e]">Requirement {requirementIndex + 1}</p>
+                                <p className="mt-1 text-sm font-bold leading-5 text-slate-700">{requirement}</p>
+                              </div>
+                              {feedback && (
+                                <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-extrabold ${feedback.className}`}>
+                                  {feedback.label}
+                                </span>
+                              )}
+                            </div>
 
-                <section className="rounded-3xl border border-[#d8def2] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
-                  <div className="flex items-center justify-between">
-                    <p className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
-                      <FileCheck2 className="h-4 w-4 text-[#243b8e]" />
-                      Requirements
-                    </p>
-                    <span className="text-xs font-extrabold text-slate-400">
-                      {requirements.length} item{requirements.length === 1 ? '' : 's'}
-                    </span>
-                  </div>
-                  {requirements.length > 0 ? (
-                    <div className="mt-3 grid gap-2">
-                      {requirements.slice(0, 3).map((requirement, index) => (
-                        <div key={`${requirement}-${index}`} className="flex gap-2 rounded-2xl bg-[#eef3ff]/70 p-2 text-xs font-semibold text-slate-700">
-                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                          <span>{requirement}</span>
+                            <input
+                              type="file"
+                              id={inputId}
+                              multiple
+                              onChange={(event) => {
+                                addRequirementFiles(requirementIndex, event.target.files);
+                                event.target.value = '';
+                              }}
+                              className="hidden"
+                            />
+                            <label
+                              htmlFor={inputId}
+                              className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[#c2cbea] bg-white px-4 py-3 text-sm font-extrabold text-[#122361] transition hover:-translate-y-0.5 hover:border-[#9eaddd] hover:bg-[#eef3ff]"
+                            >
+                              <Upload className="h-4 w-4" />
+                              {slotFiles.length > 0 ? 'Add another file' : 'Upload for this requirement'}
+                            </label>
+
+                            {slotFiles.length > 0 && (
+                              <div className="mt-2 space-y-2">
+                                {slotFiles.map((file, fileIndex) => (
+                                  <div
+                                    key={`${file.name}-${file.lastModified}-${fileIndex}`}
+                                    className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200"
+                                  >
+                                    <div className="flex min-w-0 items-center gap-2">
+                                      <File className="h-4 w-4 shrink-0 text-[#243b8e]" />
+                                      <div className="min-w-0">
+                                        <p className="truncate text-sm font-bold text-slate-700">{file.name}</p>
+                                        <p className="text-xs font-medium text-slate-400">{getFileSize(file.size)}</p>
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeRequirementFile(requirementIndex, fileIndex)}
+                                      className="rounded-full p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-500"
+                                      aria-label={`Remove ${file.name}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {feedback?.message && (
+                              <p className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold leading-5 text-slate-600 ring-1 ring-slate-200">
+                                {feedback.message}
+                              </p>
+                            )}
+                            {identityWarnings.length > 0 && (
+                              <div className="mt-2 space-y-2">
+                                {identityWarnings.map((check, checkIndex) => (
+                                  <div
+                                    key={`${check.fileName}-${check.field}-${checkIndex}`}
+                                    className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-800"
+                                  >
+                                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                    <span>{getIdentityWarningMessage(check)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="rounded-2xl bg-slate-50 p-3 text-xs font-semibold text-slate-500">
+                        No listed requirements for this document. Use supporting files if needed.
+                      </p>
+                    )}
+
+                    <div className="rounded-2xl border border-[#d8def2] bg-[#eef3ff]/60 p-3 xl:col-span-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-extrabold text-[#122361]">Other supporting files</p>
+                          <p className="text-xs font-semibold text-slate-500">Optional files that do not belong to one requirement.</p>
                         </div>
-                      ))}
-                      {requirements.length > 3 && (
-                        <p className="text-xs font-bold text-[#243b8e]">
-                          +{requirements.length - 3} more requirement{requirements.length - 3 === 1 ? '' : 's'} available in the document view.
-                        </p>
+                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-[#122361] ring-1 ring-[#d8def2]">
+                          {(draft.supportingFiles || []).length}
+                        </span>
+                      </div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        id="request-drawer-supporting-upload"
+                        multiple
+                        onChange={(event) => addSupportingFiles(event.target.files)}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="request-drawer-supporting-upload"
+                        className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-extrabold text-[#122361] shadow-sm ring-1 ring-[#d8def2] transition hover:-translate-y-0.5 hover:shadow-sm"
+                      >
+                        <Upload className="h-4 w-4" />
+                        Add supporting files
+                      </label>
+
+                      {(draft.supportingFiles || []).length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          {(draft.supportingFiles || []).map((file, index) => (
+                            <div
+                              key={`${file.name}-${file.lastModified}-${index}`}
+                              className="flex items-center justify-between gap-3 rounded-2xl bg-white px-3 py-2 ring-1 ring-slate-200"
+                            >
+                              <div className="flex min-w-0 items-center gap-2">
+                                <File className="h-4 w-4 shrink-0 text-[#243b8e]" />
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-bold text-slate-700">{file.name}</p>
+                                  <p className="text-xs font-medium text-slate-400">{getFileSize(file.size)}</p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeSupportingFile(index)}
+                                className="rounded-full p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-500"
+                                aria-label={`Remove ${file.name}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
-                  ) : (
-                    <p className="mt-2 rounded-2xl bg-slate-50 p-3 text-xs font-semibold text-slate-500">
-                      No listed requirements for this document.
-                    </p>
-                  )}
+                  </div>
+
                 </section>
               </div>
 
@@ -555,6 +945,13 @@ export function RequestDrawerProvider({ children }) {
         confirmText="Start new request"
         cancelText="Keep draft"
         confirmButtonClass="bg-[#243b8e] hover:bg-[#122361]"
+      />
+
+      <MissingRequirementsConfirmModal
+        isOpen={showMissingRequirementsConfirm}
+        documentName={draft?.document?.name}
+        onCancel={() => setShowMissingRequirementsConfirm(false)}
+        onConfirm={confirmSubmitWithoutRequirements}
       />
 
       <NotificationModal

@@ -3,6 +3,8 @@ package com.cagasi.reserbayan.controller;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -37,10 +39,15 @@ import com.cagasi.reserbayan.repository.StatusLogRepository;
 import com.cagasi.reserbayan.service.AnnouncementService;
 import com.cagasi.reserbayan.service.AdminNotificationService;
 import com.cagasi.reserbayan.service.NotificationService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
+
+    private static final Pattern NUMBER_PATTERN = Pattern.compile("\\d+");
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private ResidentRepository residentRepository;
@@ -737,6 +744,14 @@ public class AdminController {
             return ResponseEntity.status(403).body(Map.of("error", "Admin access required"));
         }
 
+        if (type.getShortDescription() == null && type.getDescription() != null) {
+            type.setShortDescription(type.getDescription());
+        }
+        if (type.getDescription() == null && type.getShortDescription() != null) {
+            type.setDescription(type.getShortDescription());
+        }
+        type.setProcessingDays(parseProcessingDays(type.getProcessingTime()));
+
         DocumentType saved = documentTypeRepository.save(type);
         return ResponseEntity.ok(saved);
     }
@@ -752,22 +767,59 @@ public class AdminController {
             return ResponseEntity.notFound().build();
         }
 
-        // Update the existing document type with frontend data
+        Map<String, Object> details = asMap(typeData.get("details"));
+
+        if (typeData.containsKey("id")) {
+            existing.setDocumentId(toStringValue(typeData.get("id")));
+        }
         if (typeData.containsKey("name")) {
-            existing.setDocumentName((String) typeData.get("name"));
+            existing.setDocumentName(toStringValue(typeData.get("name")));
         }
-        if (typeData.containsKey("description")) {
-            existing.setDescription((String) typeData.get("description"));
+
+        String shortDescription = firstString(typeData, "shortDescription", null);
+        if (shortDescription == null) {
+            shortDescription = firstString(typeData, "description", null);
         }
-        if (typeData.containsKey("category")) {
-            existing.setCategory((String) typeData.get("category"));
+        if (shortDescription != null) {
+            existing.setShortDescription(shortDescription);
+            existing.setDescription(shortDescription);
         }
-        if (typeData.containsKey("requirements")) {
-            existing.setRequirements((String) typeData.get("requirements"));
+
+        if (typeData.containsKey("imagePath")) {
+            existing.setImagePath(toStringValue(typeData.get("imagePath")));
         }
-        if (typeData.containsKey("processingTime")) {
-            existing.setProcessingTime((String) typeData.get("processingTime"));
+
+        String category = firstString(typeData, "category", details);
+        if (category != null) {
+            existing.setCategory(category);
         }
+
+        String longDescription = firstString(typeData, "longDescription", details);
+        if (longDescription != null) {
+            existing.setLongDescription(longDescription);
+        }
+
+        String processingTime = firstString(typeData, "processingTime", details);
+        if (processingTime != null) {
+            existing.setProcessingTime(processingTime);
+            existing.setProcessingDays(parseProcessingDays(processingTime));
+        }
+
+        String pdfPath = firstString(typeData, "pdfPath", details);
+        if (pdfPath != null) {
+            existing.setPdfPath(pdfPath);
+        }
+
+        Object requirements = firstValue(typeData, "requirements", details);
+        if (requirements != null) {
+            existing.setRequirements(asStoredJson(requirements));
+        }
+
+        Object uses = firstValue(typeData, "uses", details);
+        if (uses != null) {
+            existing.setUses(asStoredJson(uses));
+        }
+
         if (typeData.containsKey("isActive")) {
             existing.setActive((Boolean) typeData.get("isActive"));
         }
@@ -781,7 +833,11 @@ public class AdminController {
         formatted.put("description", saved.getDescription() != null ? saved.getDescription() : saved.getShortDescription());
         formatted.put("category", saved.getCategory());
         formatted.put("requirements", saved.getRequirements());
+        formatted.put("uses", saved.getUses());
+        formatted.put("longDescription", saved.getLongDescription());
         formatted.put("processingTime", saved.getProcessingTime());
+        formatted.put("pdfPath", saved.getPdfPath());
+        formatted.put("imagePath", saved.getImagePath());
         formatted.put("fee", 0);
         formatted.put("isActive", saved.isActive());
         formatted.put("typeId", saved.getTypeId());
@@ -824,5 +880,64 @@ public class AdminController {
         settings.put("barangayName", "Sample Barangay");
         settings.put("address", "Sample Address");
         return ResponseEntity.ok(settings);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> asMap(Object value) {
+        if (value instanceof Map<?, ?>) {
+            return (Map<String, Object>) value;
+        }
+        return Map.of();
+    }
+
+    private Object firstValue(Map<String, Object> root, String key, Map<String, Object> details) {
+        if (root.containsKey(key)) {
+            return root.get(key);
+        }
+        if (details != null && details.containsKey(key)) {
+            return details.get(key);
+        }
+        return null;
+    }
+
+    private String firstString(Map<String, Object> root, String key, Map<String, Object> details) {
+        Object value = firstValue(root, key, details);
+        return value == null ? null : toStringValue(value);
+    }
+
+    private String toStringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private String asStoredJson(Object value) {
+        if (value instanceof String) {
+            return (String) value;
+        }
+
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            return "[]";
+        }
+    }
+
+    private int parseProcessingDays(String processingTime) {
+        if (processingTime == null || processingTime.isBlank()) {
+            return 0;
+        }
+
+        String normalized = processingTime.toLowerCase();
+        if (normalized.contains("var") || normalized.contains("hour") || normalized.contains("minute")
+                || !normalized.contains("day")) {
+            return 0;
+        }
+
+        Matcher matcher = NUMBER_PATTERN.matcher(normalized);
+        int days = 0;
+        while (matcher.find()) {
+            days = Math.max(days, Integer.parseInt(matcher.group()));
+        }
+
+        return days > 0 ? days : 1;
     }
 }

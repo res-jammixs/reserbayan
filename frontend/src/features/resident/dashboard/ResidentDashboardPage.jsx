@@ -16,6 +16,17 @@ import RejectedResubmitModal from '@/app/components/RejectedResubmitModal';
 import AnnouncementModal from '@/app/components/AnnouncementModal';
 import { StatusBadge } from '@/shared/components/ui/StatusBadge';
 
+function isAnnouncementVisibleNow(announcement) {
+  const now = new Date();
+  const startDate = announcement?.startDate ? new Date(announcement.startDate) : null;
+  const endDate = announcement?.endDate ? new Date(announcement.endDate) : null;
+
+  if (startDate && now < startDate) return false;
+  if (endDate && now > endDate) return false;
+
+  return true;
+}
+
 export default function DashboardPage() {
   const { user } = useUser();
   const {
@@ -55,16 +66,10 @@ export default function DashboardPage() {
     try {
       setAnnouncementsLoading(true);
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      
-      if (!token) {
-        console.error('No authentication token found');
-        setAnnouncements([]);
-        return;
-      }
-      
-      const response = await fetch('http://localhost:8080/api/residents/announcements', {
+
+      const response = await fetch('/api/residents/announcements', {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           'Content-Type': 'application/json'
         }
       });
@@ -72,16 +77,18 @@ export default function DashboardPage() {
       if (response.ok) {
         const responseData = await response.json();
         // Extract the announcements array from the response
-        const announcementsList = responseData.announcements || [];
+        const announcementsList = (responseData.announcements || []).filter(isAnnouncementVisibleNow);
         console.log('Fetched announcements:', announcementsList.length, announcementsList);
         setAnnouncements(announcementsList);
       } else {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error('Failed to fetch announcements:', response.status, response.statusText, errorText);
+        if (response.status !== 401 && response.status !== 403) {
+          const errorText = await response.text().catch(() => 'Unknown error');
+          console.warn('Failed to fetch announcements:', response.status, response.statusText, errorText);
+        }
         setAnnouncements([]);
       }
     } catch (error) {
-      console.error('Error fetching announcements:', error);
+      console.warn('Error fetching announcements:', error);
       setAnnouncements([]);
     } finally {
       setAnnouncementsLoading(false);
@@ -131,20 +138,9 @@ export default function DashboardPage() {
     return 'Available now';
   };
 
-  const isAnnouncementCurrentlyActive = (announcement) => {
-    const now = new Date();
-    const startDate = announcement.startDate ? new Date(announcement.startDate) : null;
-    const endDate = announcement.endDate ? new Date(announcement.endDate) : null;
-
-    if (startDate && now < startDate) return false;
-    if (endDate && now > endDate) return false;
-
-    return true;
-  };
-
   const latestActiveAnnouncement = useMemo(() => {
     return announcements
-      .filter(isAnnouncementCurrentlyActive)
+      .filter(isAnnouncementVisibleNow)
       .sort((firstAnnouncement, secondAnnouncement) => (
         new Date(secondAnnouncement.createdAt) - new Date(firstAnnouncement.createdAt)
       ))[0] || null;
