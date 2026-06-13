@@ -23,7 +23,9 @@ import RequestModal from '@/app/components/requests/RequestModal';
 import RequestsList from '@/app/components/requests/RequestsList';
 import FilterDropdown from '@/shared/components/forms/FilterDropdown';
 
-const statusKeys = ['pending', 'approved', 'completed', 'rejected', 'cancelled'];
+const normalizeRequestStatus = (status) => status?.toLowerCase().replace(/[\s_-]+/g, '-') || '';
+
+const statusKeys = ['pending', 'approved', 'ready-for-pickup', 'completed', 'rejected', 'cancelled'];
 
 const sortOptions = [
   { value: 'submittedAt', label: 'Date' },
@@ -120,7 +122,7 @@ export default function RequestsPage() {
 
   const statusOptions = useMemo(() => {
     const counts = statusKeys.reduce((accumulator, status) => {
-      accumulator[status] = requests.filter((request) => request.status?.toLowerCase() === status).length;
+      accumulator[status] = requests.filter((request) => normalizeRequestStatus(request.status) === status).length;
       return accumulator;
     }, {});
 
@@ -128,6 +130,7 @@ export default function RequestsPage() {
       { value: 'all', label: `All Requests (${requests.length})` },
       { value: 'pending', label: `Pending (${counts.pending || 0})` },
       { value: 'approved', label: `Approved (${counts.approved || 0})` },
+      { value: 'ready-for-pickup', label: `Ready for Pickup (${counts['ready-for-pickup'] || 0})` },
       { value: 'completed', label: `Completed (${counts.completed || 0})` },
       { value: 'rejected', label: `Rejected (${counts.rejected || 0})` },
       { value: 'cancelled', label: `Cancelled (${counts.cancelled || 0})` },
@@ -138,7 +141,7 @@ export default function RequestsPage() {
     const normalizedSearchTerm = searchTerm.toLowerCase().trim();
 
     return requests
-      .filter((request) => selectedStatus === 'all' || request.status?.toLowerCase() === selectedStatus)
+      .filter((request) => selectedStatus === 'all' || normalizeRequestStatus(request.status) === selectedStatus)
       .filter((request) => {
         if (!normalizedSearchTerm) return true;
 

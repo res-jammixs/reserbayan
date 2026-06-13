@@ -5,6 +5,7 @@ export function getAttachmentCount(request) {
 
 export function getRequestStatusAccent(status) {
   const statusLower = status?.toLowerCase() || '';
+  const normalizedStatus = statusLower.replace(/[\s_-]+/g, '-');
 
   const accents = {
     pending: {
@@ -18,6 +19,12 @@ export function getRequestStatusAccent(status) {
       bar: 'from-emerald-500 via-green-500 to-teal-400',
       glow: 'from-emerald-50 to-green-50',
       icon: 'from-emerald-600 to-green-500',
+    },
+    'ready-for-pickup': {
+      compact: 'from-[#2f84c0] to-emerald-500',
+      bar: 'from-[#243b8e] via-[#2f84c0] to-emerald-400',
+      glow: 'from-[#eef3ff] to-emerald-50',
+      icon: 'from-[#2f84c0] to-emerald-500',
     },
     completed: {
       compact: 'from-[#243b8e] to-[#2f84c0]',
@@ -33,7 +40,7 @@ export function getRequestStatusAccent(status) {
     },
   };
 
-  if (statusLower === 'rejected' || statusLower === 'declined') {
+  if (normalizedStatus === 'rejected' || normalizedStatus === 'declined') {
     return {
       compact: 'from-red-500 to-rose-500',
       bar: 'from-red-500 via-rose-500 to-red-400',
@@ -42,7 +49,7 @@ export function getRequestStatusAccent(status) {
     };
   }
 
-  return accents[statusLower] || {
+  return accents[normalizedStatus] || {
     compact: 'from-[#243b8e] to-[#2f84c0]',
     bar: 'from-[#243b8e] via-[#2f84c0] to-[#2f84c0]',
     glow: 'from-[#eef3ff] to-[#eef3ff]',

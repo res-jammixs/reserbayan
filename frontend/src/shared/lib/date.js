@@ -27,5 +27,8 @@ export function formatShortDateTime(dateValue, fallback = 'Recently') {
 
 export function formatStatusLabel(status) {
   if (!status) return '';
+  if (status.toLowerCase().replace(/[\s_-]+/g, '-') === 'ready-for-pickup') {
+    return 'Ready for Pickup';
+  }
   return status.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
 }

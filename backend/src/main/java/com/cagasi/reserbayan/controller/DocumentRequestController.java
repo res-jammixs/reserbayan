@@ -32,10 +32,12 @@ import com.cagasi.reserbayan.entity.DocumentType;
 import com.cagasi.reserbayan.entity.RequestAttachment;
 import com.cagasi.reserbayan.entity.Resident;
 import com.cagasi.reserbayan.entity.ResidentStatus;
+import com.cagasi.reserbayan.entity.StatusLog;
 import com.cagasi.reserbayan.repository.DocumentRequestRepository;
 import com.cagasi.reserbayan.repository.DocumentTypeRepository;
 import com.cagasi.reserbayan.repository.RequestAttachmentRepository;
 import com.cagasi.reserbayan.repository.ResidentRepository;
+import com.cagasi.reserbayan.repository.StatusLogRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
@@ -60,6 +62,9 @@ public class DocumentRequestController {
 
     @Autowired
     private ResidentRepository residentRepository;
+
+    @Autowired
+    private StatusLogRepository statusLogRepository;
 
     @Autowired
     private AdminNotificationService adminNotificationService;
@@ -426,17 +431,30 @@ public class DocumentRequestController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
 
-            DocumentRequest documentRequest = documentRequestRepository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Document request not found"));
+            Optional<DocumentRequest> optionalRequest = documentRequestRepository.findById(id);
+            if (optionalRequest.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Document request not found");
+            }
+
+            DocumentRequest documentRequest = optionalRequest.get();
+            if (!"Pending".equals(documentRequest.getStatus())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("Request must be pending before approval");
+            }
 
             documentRequest.setStatus("Approved");
             documentRequest.setUpdatedAt(java.time.LocalDateTime.now());
             DocumentRequest savedRequest = documentRequestRepository.save(documentRequest);
 
+            StatusLog statusLog = new StatusLog();
+            statusLog.setDocumentRequest(savedRequest);
+            statusLog.setStatus("Approved");
+            statusLog.setTimestamp(java.time.LocalDateTime.now());
+            statusLogRepository.save(statusLog);
+
             notificationService.createNotification(
                     savedRequest.getResident(),
                     "Document Request Approved",
-                    "Your request for '" + savedRequest.getDocumentName() + "' has been approved.",
+                    "Your request for '" + savedRequest.getDocumentName() + "' has been verified and is being prepared.",
                     "REQUEST_APPROVED",
                     null,
                     "DOCUMENT_REQUEST",
@@ -445,6 +463,49 @@ public class DocumentRequestController {
             return ResponseEntity.ok("Request approved successfully");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error approving request");
+        }
+    }
+
+    @PutMapping("/{id}/ready-for-pickup")
+    public ResponseEntity<String> markDocumentRequestReadyForPickup(@PathVariable Long id, HttpServletRequest request) {
+        try {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+
+            Optional<DocumentRequest> optionalRequest = documentRequestRepository.findById(id);
+            if (optionalRequest.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Document request not found");
+            }
+
+            DocumentRequest documentRequest = optionalRequest.get();
+            if (!"Approved".equals(documentRequest.getStatus())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("Request must be approved before pickup");
+            }
+
+            documentRequest.setStatus("Ready for Pickup");
+            documentRequest.setUpdatedAt(java.time.LocalDateTime.now());
+            DocumentRequest savedRequest = documentRequestRepository.save(documentRequest);
+
+            StatusLog statusLog = new StatusLog();
+            statusLog.setDocumentRequest(savedRequest);
+            statusLog.setStatus("Ready for Pickup");
+            statusLog.setTimestamp(java.time.LocalDateTime.now());
+            statusLogRepository.save(statusLog);
+
+            notificationService.createNotification(
+                    savedRequest.getResident(),
+                    "Document Ready for Pickup",
+                    "Your request for '" + savedRequest.getDocumentName() + "' is ready to claim at the barangay office.",
+                    "REQUEST_READY_FOR_PICKUP",
+                    null,
+                    "DOCUMENT_REQUEST",
+                    savedRequest.getRequestId());
+
+            return ResponseEntity.ok("Request marked ready for pickup");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error marking request ready for pickup");
         }
     }
 

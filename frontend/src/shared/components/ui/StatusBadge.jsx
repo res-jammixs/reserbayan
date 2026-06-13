@@ -6,6 +6,7 @@ import { formatStatusLabel } from '@/shared/lib/date';
 export function StatusBadge({ status, className = '', size = 'md' }) {
   const getStatusConfig = (status) => {
     const statusLower = status ? status.toLowerCase() : '';
+    const normalizedStatus = statusLower.replace(/[\s_-]+/g, '-');
     
     const configs = {
       approved: {
@@ -14,6 +15,13 @@ export function StatusBadge({ status, className = '', size = 'md' }) {
         bgColor: 'bg-green-50',
         textColor: 'text-green-700',
         borderColor: 'border-green-200'
+      },
+      'ready-for-pickup': {
+        icon: CheckCircle,
+        iconColor: 'text-[#2f84c0]',
+        bgColor: 'bg-[#eef3ff]',
+        textColor: 'text-[#122361]',
+        borderColor: 'border-[#c2cbea]'
       },
       completed: {
         icon: CheckCircle,
@@ -45,7 +53,7 @@ export function StatusBadge({ status, className = '', size = 'md' }) {
       }
     };
 
-    return configs[statusLower] || {
+    return configs[normalizedStatus] || {
       icon: AlertCircle,
       iconColor: 'text-gray-600',
       bgColor: 'bg-gray-50',

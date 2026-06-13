@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Ban, FileText, Calendar, XCircle, Paperclip, Edit2, Save, Trash2, Plus, RotateCcw, Mail, MapPin, Phone, User, CheckCircle } from 'lucide-react';
+import { Ban, FileText, Calendar, XCircle, Paperclip, Edit2, Save, Trash2, Plus, RotateCcw, Mail, MapPin, Phone, User, CheckCircle, PackageCheck } from 'lucide-react';
 import NotificationModal from '@/app/components/NotificationModal';
 import ConfirmationModal from '@/shared/components/modals/ConfirmationModal';
 import RejectionReasonModal from '@/shared/components/modals/RejectionReasonModal';
 import AiReviewPanel from '@/shared/components/ai/AiReviewPanel';
+import RequestProgressTracker from './RequestProgressTracker';
 import { motion } from 'framer-motion';
 
-function RequestModal({ request, user, onClose, cancelRequest, completeRequest, approveRequest, rejectRequest, onReRequest, onUpdateRequest }) {
+function RequestModal({ request, user, onClose, cancelRequest, completeRequest, readyForPickupRequest, approveRequest, rejectRequest, onReRequest, onUpdateRequest }) {
   const [notification, setNotification] = useState(null);
   
   // --- LOCAL DISPLAY STATE ---
@@ -26,12 +27,14 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
   const [newFiles, setNewFiles] = useState([]); 
   const [isSaving, setIsSaving] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isMarkingReady, setIsMarkingReady] = useState(false);
   const [isDownloading, setIsDownloading] = useState({});
   const [confirmation, setConfirmation] = useState(null);
   const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
 
   if (!displayRequest) return null;
+  const normalizedStatus = displayRequest.status?.toLowerCase().replace(/[\s_-]+/g, '-') || '';
 
   // --- HELPERS ---
   const residentFullName = displayRequest.residentName
@@ -57,10 +60,12 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
   ];
 
   const getStatusIcon = (status) => {
-    const statusLower = status ? status.toLowerCase() : '';
+    const statusLower = status ? status.toLowerCase().replace(/[\s_-]+/g, '-') : '';
     switch (statusLower) {
       case 'approved':
         return <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center"><span className="text-white text-xs">✓</span></div>;
+      case 'ready-for-pickup':
+        return <div className="w-5 h-5 bg-[#2f84c0] rounded-full flex items-center justify-center"><PackageCheck className="h-3 w-3 text-white" /></div>;
       case 'completed':
         return <div className="w-5 h-5 bg-[#2f84c0] rounded-full flex items-center justify-center"><span className="text-white text-xs">✓</span></div>;
       case 'pending':
@@ -235,6 +240,46 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
     } finally {
       setIsRejecting(false);
     }
+  };
+
+  const handleReadyForPickupRequest = async () => {
+    setConfirmation({
+      type: 'complete',
+      title: 'Mark Ready for Pick Up',
+      message: 'Mark this request as ready for pick up? The resident will be notified that the document can be claimed.',
+      confirmText: 'Mark Ready',
+      confirmButtonClass: 'bg-[#243b8e] hover:bg-[#122361]',
+      onConfirm: async () => {
+        setIsMarkingReady(true);
+        try {
+          if (!readyForPickupRequest) {
+            throw new Error('Marking requests ready for pickup is not available in this view.');
+          }
+
+          const updatedRequest = await readyForPickupRequest(displayRequest.requestId);
+
+          setDisplayRequest((current) => ({
+            ...current,
+            ...(updatedRequest || {}),
+            status: 'Ready for Pickup',
+            updatedAt: updatedRequest?.updatedAt || new Date().toISOString(),
+          }));
+
+          setNotification({
+            type: 'success',
+            title: 'Ready for Pick Up',
+            message: 'Document request has been marked ready for pick up.',
+            autoClose: true
+          });
+
+          if (onUpdateRequest) onUpdateRequest();
+        } catch (err) {
+          setNotification({ type: 'error', title: 'Update Failed', message: err.message });
+        } finally {
+          setIsMarkingReady(false);
+        }
+      },
+    });
   };
 
   const handleCompleteRequest = async () => {
@@ -420,14 +465,36 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
         >
          
         <div className="sticky top-0 z-10 border-b border-gray-200 bg-gradient-to-r from-[#eef3ff] to-white p-3 sm:p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="bg-gradient-to-r from-[#122361] to-[#2f84c0] text-white rounded-lg p-2 w-10 h-10 flex-shrink-0 flex items-center justify-center shadow-sm">
                 <FileText className="w-5 h-5" aria-hidden="true" />
               </div>
-              <h2 id="modal-title" className="text-2xl font-bold text-[#00114e]">
-                {isEditing ? 'Edit Request' : 'Request Details'}
-              </h2>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 id="modal-title" className="text-xl font-bold leading-tight text-[#00114e] sm:text-2xl">
+                    {isEditing ? 'Edit Request' : 'Request Details'}
+                  </h2>
+                  {!isEditing && (
+                    <>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#c2cbea] bg-white/80 px-2.5 py-1 text-xs font-bold text-[#122361]">
+                      {getStatusIcon(displayRequest.status)}
+                      {displayRequest.status}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-bold text-green-800">
+                      <Calendar className="h-3.5 w-3.5 text-[#243b8e]" aria-hidden="true" />
+                      {new Date(displayRequest.submittedAt).toLocaleDateString('en-US', {
+                        timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric'
+                      })}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#c2cbea] bg-[#eef3ff] px-2.5 py-1 text-xs font-bold text-[#00114e]">
+                      <FileText className="h-3.5 w-3.5 text-[#243b8e]" aria-hidden="true" />
+                      #{displayRequest.requestId}
+                    </span>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
             <button
               onClick={onClose}
@@ -441,19 +508,22 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
 
         <div className="space-y-3 p-3 sm:p-4">
           {!isEditing && (
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)_150px]">
-              <div className="flex items-center gap-3 rounded-xl border border-[#c2cbea] bg-gradient-to-r from-[#eef3ff] to-[#d8def2] p-3">
+            <div className="space-y-2">
+              <RequestProgressTracker request={displayRequest} />
+
+            <div className="hidden">
+              <div className="flex items-center gap-2 rounded-lg border border-[#c2cbea] bg-gradient-to-r from-[#eef3ff] to-[#d8def2] px-3 py-2">
                 {getStatusIcon(displayRequest.status)}
                 <div>
-                  <p className="text-xs font-medium text-[#122361]">Current Status</p>
-                  <p className="text-base font-bold text-[#00114e]">{displayRequest.status}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#122361]">Status</p>
+                  <p className="text-sm font-bold leading-tight text-[#00114e]">{displayRequest.status}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-3">
+              <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2">
                 <Calendar className="h-4 w-4 shrink-0 text-[#243b8e]" aria-hidden="true" />
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-green-800">Submitted</p>
-                  <p className="truncate text-xs text-green-700">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-green-800">Submitted</p>
+                  <p className="truncate text-xs font-semibold text-green-700">
                     {new Date(displayRequest.submittedAt).toLocaleDateString('en-US', {
                       timeZone: 'Asia/Manila', month: 'long', day: 'numeric', year: 'numeric'
                     })}
@@ -471,29 +541,30 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                   )}
                 </div>
               </div>
-              <div className="rounded-xl border border-[#c2cbea] bg-[#eef3ff] p-3 text-right">
-                <p className="text-xs font-medium text-[#122361]">Request ID</p>
-                <p className="text-base font-bold text-[#00114e]">#{displayRequest.requestId}</p>
+              <div className="rounded-lg border border-[#c2cbea] bg-[#eef3ff] px-3 py-2 text-right">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#122361]">Request ID</p>
+                <p className="text-sm font-bold leading-tight text-[#00114e]">#{displayRequest.requestId}</p>
               </div>
+            </div>
             </div>
           )}
 
           <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
             <div className="space-y-2">
               <div>
-                <h3 className="mb-2 flex items-center gap-2 font-bold text-gray-900">
+                <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-900">
                   <FileText className="h-4 w-4 text-[#243b8e]" aria-hidden="true" />
                   Document Information
                 </h3>
                 <div className={`grid gap-2 ${processingTime ? 'md:grid-cols-[minmax(0,1fr)_180px]' : ''}`}>
                   <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Document Name</p>
-                    <p className="mt-1 text-base font-bold text-gray-900">{displayRequest.documentName}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Document Name</p>
+                    <p className="mt-1 text-sm font-bold text-gray-900">{displayRequest.documentName}</p>
                   </div>
                   {processingTime && (
                     <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Processing Time</p>
-                      <p className="mt-1 text-base font-bold text-gray-900">{processingTime}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Processing Time</p>
+                      <p className="mt-1 text-sm font-bold text-gray-900">{processingTime}</p>
                     </div>
                   )}
                 </div>
@@ -501,7 +572,7 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
 
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="font-bold text-gray-900">Purpose & Details</h3>
+                  <h3 className="text-sm font-bold text-gray-900">Purpose & Details</h3>
                   {!isEditing && user !== null && displayRequest.status === 'Pending' && (
                     <button
                       onClick={() => setIsEditing(true)}
@@ -521,13 +592,13 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                   />
                 ) : (
                   <div className="rounded-lg border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 p-3">
-                    <p className="line-clamp-3 text-gray-700 leading-relaxed whitespace-pre-wrap">{displayRequest.details}</p>
+                    <p className="line-clamp-3 text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">{displayRequest.details}</p>
                   </div>
                 )}
               </div>
 
               <div>
-                <h3 className="mb-2 flex items-center gap-2 font-bold text-gray-900">
+                <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-900">
                   <Paperclip className="h-4 w-4 text-[#243b8e]" aria-hidden="true" />
                   Attached Requirements
                 </h3>
@@ -670,35 +741,48 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                      </button>
                  )}
 
-                 {user === null && displayRequest.status?.toLowerCase() === 'pending' && (
+                 {user === null && normalizedStatus === 'pending' && (
                     <>
                     <button
                         onClick={handleRejectRequest}
-                        className="rounded-lg bg-red-600 px-5 py-2 font-medium text-white shadow-sm transition-colors hover:bg-red-700"
+                        className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-5 py-2 font-medium text-red-700 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100"
                     >
+                        <XCircle className="h-4 w-4" aria-hidden="true" />
                         Reject Request
                     </button>
                     <button
                         onClick={handleApproveRequest}
-                        className="rounded-lg bg-green-600 px-5 py-2 font-medium text-white shadow-sm transition-colors hover:bg-green-700"
+                        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#243b8e] to-[#2f84c0] px-5 py-2 font-medium text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0]"
                     >
+                        <CheckCircle className="h-4 w-4" aria-hidden="true" />
                         Approve Request
                     </button>
                     </>
                  )}
 
-                 {user === null && displayRequest.status?.toLowerCase() === 'approved' && (
+                 {user === null && normalizedStatus === 'approved' && (
                     <button
-                        onClick={handleCompleteRequest}
-                        disabled={isCompleting}
-                        className="flex items-center gap-2 rounded-lg bg-[#243b8e] px-5 py-2 font-medium text-white shadow-sm transition-colors hover:bg-[#122361] disabled:cursor-not-allowed disabled:opacity-70"
+                        onClick={handleReadyForPickupRequest}
+                        disabled={isMarkingReady}
+                        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#243b8e] to-[#2f84c0] px-5 py-2 font-medium text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0] disabled:cursor-not-allowed disabled:opacity-70"
                     >
-                        <CheckCircle className="w-4 h-4" />
-                        {isCompleting ? 'Completing...' : 'Mark as Complete'}
+                        <PackageCheck className="w-4 h-4" />
+                        {isMarkingReady ? 'Updating...' : 'Mark Ready for Pick Up'}
                     </button>
                  )}
 
-                 {user !== null && displayRequest.status?.toLowerCase() === 'pending' && (
+                 {user === null && normalizedStatus === 'ready-for-pickup' && (
+                    <button
+                        onClick={handleCompleteRequest}
+                        disabled={isCompleting}
+                        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#243b8e] to-[#2f84c0] px-5 py-2 font-medium text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0] disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                        <CheckCircle className="w-4 h-4" />
+                        {isCompleting ? 'Completing...' : 'Mark as Completed'}
+                    </button>
+                 )}
+
+                 {user !== null && normalizedStatus === 'pending' && (
                     <button
                     onClick={handleCancelRequest}
                     className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-5 py-2 font-medium text-red-700 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100"
