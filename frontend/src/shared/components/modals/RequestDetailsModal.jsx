@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, User, FileText, Calendar, Clock, Info, Paperclip, Download, CheckCircle, XCircle } from 'lucide-react';
+import { X, User, FileText, Calendar, Clock, Info, Paperclip, Download, CheckCircle, XCircle, PackageCheck } from 'lucide-react';
 import AiReviewPanel from '@/shared/components/ai/AiReviewPanel';
 import NotificationModal from '@/app/components/NotificationModal';
+import RequestProgressTracker from '@/app/components/requests/RequestProgressTracker';
 
 export default function RequestDetailsModal({
   isOpen,
@@ -13,6 +14,7 @@ export default function RequestDetailsModal({
   loading = false,
   onApprove,
   onReject,
+  onReadyForPickup,
   onComplete
 }) {
   const [isDownloading, setIsDownloading] = useState({});
@@ -118,6 +120,7 @@ export default function RequestDetailsModal({
   };
 
   if (!isOpen || !requestDetails) return null;
+  const normalizedStatus = requestDetails.status?.toLowerCase().replace(/[\s_-]+/g, '-') || '';
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -142,11 +145,13 @@ export default function RequestDetailsModal({
   };
 
   const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
+    switch (status?.toLowerCase().replace(/[\s_-]+/g, '-')) {
       case 'pending':
         return 'bg-[#d8def2] text-[#122361] border-[#c2cbea]';
       case 'approved':
         return 'bg-[#c2cbea] text-[#00114e] border-[#9eaddd]';
+      case 'ready-for-pickup':
+        return 'bg-[#eef3ff] text-[#122361] border-[#c2cbea]';
       case 'completed':
         return 'bg-green-100 text-green-800 border-green-200';
       case 'rejected':
@@ -204,6 +209,8 @@ export default function RequestDetailsModal({
             </div>
           ) : (
             <div className="space-y-6">
+              <RequestProgressTracker request={requestDetails} />
+
               {/* Request Header */}
               <div className="bg-gradient-to-r from-[#122361] to-[#2f84c0] rounded-xl p-6 border border-[#d8def2]">
                 <div className="flex items-start gap-4">
@@ -391,35 +398,44 @@ export default function RequestDetailsModal({
         {!loading && (
           <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex gap-3">
             {/* Action buttons based on status */}
-            {requestDetails?.status === 'Pending' && (
+            {normalizedStatus === 'pending' && (
               <>
                 <button
                   onClick={() => onReject(requestDetails.id || requestDetails.requestId)}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-colors bg-red-600 text-white hover:bg-red-700"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium border border-red-200 bg-red-50 text-red-700 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100"
                 >
                   <XCircle className="w-5 h-5" />
                   Reject Request
                 </button>
                 <button
                   onClick={() => onApprove(requestDetails.id || requestDetails.requestId)}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-colors bg-green-600 text-white hover:bg-green-700"
+                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0]"
                 >
                   <CheckCircle className="w-5 h-5" />
                   Approve Request
                 </button>
               </>
             )}
-            {requestDetails?.status === 'Approved' && onComplete && (
+            {normalizedStatus === 'approved' && onReadyForPickup && (
+              <button
+                onClick={() => onReadyForPickup(requestDetails.id || requestDetails.requestId)}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0]"
+              >
+                <PackageCheck className="w-5 h-5" />
+                Mark Ready for Pick Up
+              </button>
+            )}
+            {normalizedStatus === 'ready-for-pickup' && onComplete && (
               <button
                 onClick={() => onComplete(requestDetails.id || requestDetails.requestId)}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-colors bg-[#243b8e] text-white hover:bg-[#122361]"
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0]"
               >
                 <CheckCircle className="w-5 h-5" />
-                Complete Request
+                Mark as Completed
               </button>
             )}
             {/* For completed requests, show close button only */}
-            {requestDetails?.status === 'Completed' && (
+            {normalizedStatus === 'completed' && (
               <button
                 onClick={onClose}
                 className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-colors bg-gray-600 text-white hover:bg-gray-700"

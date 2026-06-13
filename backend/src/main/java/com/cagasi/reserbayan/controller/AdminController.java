@@ -309,8 +309,43 @@ public class AdminController {
         notificationService.createNotification(
                 request.getResident(),
                 "Document Request Approved",
-                "Your request for '" + request.getDocumentName() + "' has been approved.",
+                "Your request for '" + request.getDocumentName() + "' has been verified and is being prepared.",
                 "REQUEST_APPROVED",
+                null,
+                AdminNotificationService.TARGET_DOCUMENT_REQUEST,
+                savedRequest.getRequestId());
+
+        return ResponseEntity.ok(savedRequest);
+    }
+
+    @PutMapping("/requests/{id}/ready-for-pickup")
+    public ResponseEntity<?> markDocumentRequestReadyForPickup(@PathVariable Long id) {
+        if (!hasAdminAccess()) {
+            return ResponseEntity.status(403).body(Map.of("error", "Admin access required"));
+        }
+
+        DocumentRequest request = documentRequestRepository.findById(id).orElse(null);
+        if (request == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!request.getStatus().equals("Approved")) {
+            return ResponseEntity.status(409).body(Map.of("error", "Only approved requests can be marked ready for pickup"));
+        }
+        request.setStatus("Ready for Pickup");
+        request.setUpdatedAt(java.time.LocalDateTime.now());
+        DocumentRequest savedRequest = documentRequestRepository.save(request);
+
+        StatusLog statusLog = new StatusLog();
+        statusLog.setDocumentRequest(savedRequest);
+        statusLog.setStatus("Ready for Pickup");
+        statusLog.setTimestamp(java.time.LocalDateTime.now());
+        statusLogRepository.save(statusLog);
+
+        notificationService.createNotification(
+                request.getResident(),
+                "Document Ready for Pickup",
+                "Your request for '" + request.getDocumentName() + "' is ready to claim at the barangay office.",
+                "REQUEST_READY_FOR_PICKUP",
                 null,
                 AdminNotificationService.TARGET_DOCUMENT_REQUEST,
                 savedRequest.getRequestId());
@@ -368,8 +403,11 @@ public class AdminController {
         }
 
         DocumentRequest request = documentRequestRepository.findById(id).orElse(null);
-        if (request == null || !request.getStatus().equals("Approved")) {
+        if (request == null) {
             return ResponseEntity.notFound().build();
+        }
+        if (!request.getStatus().equals("Ready for Pickup")) {
+            return ResponseEntity.status(409).body(Map.of("error", "Only requests ready for pickup can be completed"));
         }
         request.setStatus("Completed");
         request.setUpdatedAt(java.time.LocalDateTime.now());
@@ -386,7 +424,7 @@ public class AdminController {
         notificationService.createNotification(
                 request.getResident(),
                 "Document Request Completed",
-                "Your request for '" + request.getDocumentName() + "' has been completed and is ready for pickup.",
+                "Your request for '" + request.getDocumentName() + "' has been completed.",
                 "REQUEST_COMPLETED",
                 null,
                 AdminNotificationService.TARGET_DOCUMENT_REQUEST,

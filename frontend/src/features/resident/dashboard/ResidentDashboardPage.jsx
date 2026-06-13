@@ -27,6 +27,10 @@ function isAnnouncementVisibleNow(announcement) {
   return true;
 }
 
+function normalizeRequestStatus(status) {
+  return String(status || '').trim().toLowerCase().replace(/[\s_-]+/g, '-');
+}
+
 export default function DashboardPage() {
   const { user } = useUser();
   const {
@@ -59,6 +63,19 @@ export default function DashboardPage() {
     return requests
       .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
       .slice(0, 3);
+  }, [requests]);
+
+  const requestUpdates = useMemo(() => {
+    return requests
+      .filter((request) => {
+        const status = normalizeRequestStatus(request.status);
+        return status === 'approved' || status === 'ready-for-pickup';
+      })
+      .sort((firstRequest, secondRequest) => (
+        new Date(secondRequest.updatedAt || secondRequest.submittedAt || 0) -
+        new Date(firstRequest.updatedAt || firstRequest.submittedAt || 0)
+      ))
+      .slice(0, 4);
   }, [requests]);
 
   // Fetch announcements for residents
@@ -153,18 +170,18 @@ export default function DashboardPage() {
   }, [user]);
 
   useEffect(() => {
-    if (announcementsLoading) return;
+    if (announcementsLoading || loading) return;
 
     const shouldShowModal = sessionStorage.getItem('showDashboardAnnouncementModal') === 'true';
     if (!shouldShowModal) return;
 
-    if (latestActiveAnnouncement) {
+    if (latestActiveAnnouncement || requestUpdates.length > 0) {
       setShowLatestAnnouncementModal(true);
     } else {
       sessionStorage.removeItem('showDashboardAnnouncementModal');
       setShowLatestAnnouncementModal(false);
     }
-  }, [announcementsLoading, latestActiveAnnouncement]);
+  }, [announcementsLoading, latestActiveAnnouncement, loading, requestUpdates.length]);
 
   const dismissLatestAnnouncementModal = () => {
     sessionStorage.removeItem('showDashboardAnnouncementModal');
@@ -512,7 +529,12 @@ export default function DashboardPage() {
         <AnnouncementModal
           isOpen={showLatestAnnouncementModal}
           announcement={latestActiveAnnouncement}
+          requestUpdates={requestUpdates}
           onDismiss={dismissLatestAnnouncementModal}
+          onViewRequests={() => {
+            dismissLatestAnnouncementModal();
+            router.push('/requests');
+          }}
         />
 
         {showExistingRequestPrompt && (

@@ -39,6 +39,8 @@ const managementTabConfig = {
   'document-requests': { label: 'Document Requests', icon: FileText, color: 'purple', description: 'Review and process document requests' },
 };
 
+const normalizeWorkflowStatus = (status) => String(status || '').trim().toLowerCase().replace(/[\s_-]+/g, '-');
+
 const getActiveTabStyles = (color) => {
   const styles = {
     blue: 'bg-[#eef3ff] text-[#122361] border border-[#c2cbea] shadow-sm',
@@ -736,7 +738,9 @@ function AdminManagementContent({ variant = 'superadmin' }) {
     setConfirmationModal({
       type: 'approve',
       title: 'Confirm Approval',
-      message: `Are you sure you want to approve ${displayName}? This will grant them full access to request documents.`,
+      message: activeTab === 'resident-requests'
+        ? `Are you sure you want to approve ${displayName}? This will grant them full access to request documents.`
+        : `Are you sure you want to verify this document request for ${displayName}? The request will move to document preparation.`,
       confirmText: 'Approve',
       confirmButtonClass: 'bg-green-600 hover:bg-green-700',
       onConfirm: async () => {
@@ -914,6 +918,47 @@ function AdminManagementContent({ variant = 'superadmin' }) {
           setPasswordPromptLoading(false);
         }
       },
+    });
+  };
+
+  const handleReadyForPickupDocument = async (item) => {
+    const displayName = item.resident ?
+      [item.resident.firstName, item.resident.lastName].filter(name => name && name.trim()).join(' ').trim() || 'Unknown Resident' :
+      'Unknown Resident';
+
+    setConfirmationModal({
+      type: 'complete',
+      title: 'Mark Ready for Pick Up',
+      message: `Mark the document request for ${displayName} as ready for pick up? This will notify the resident that the document can be claimed.`,
+      confirmText: 'Mark Ready',
+      confirmButtonClass: 'bg-[#243b8e] hover:bg-[#122361]',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${apiBase}/requests/${item.requestId}/ready-for-pickup`, {
+            method: 'PUT',
+            headers: token ? {
+              'Authorization': `Bearer ${token}`,
+            } : {},
+          });
+          if (!response.ok) throw new Error('Failed to mark document ready for pickup');
+
+          fetchData(activeTab, true);
+          setNotificationModal({
+            type: 'success',
+            title: 'Document Ready for Pickup',
+            message: 'Resident has been notified that the document is ready to claim.',
+            autoClose: true,
+            autoCloseDelay: 3000
+          });
+        } catch (err) {
+          setNotificationModal({
+            type: 'error',
+            title: 'Update Failed',
+            message: 'Error marking document ready for pickup: ' + err.message
+          });
+        }
+      }
     });
   };
 
@@ -1124,6 +1169,7 @@ function AdminManagementContent({ variant = 'superadmin' }) {
                       { value: '', label: 'All Status' },
                       { value: 'Pending', label: 'Pending' },
                       { value: 'Approved', label: 'Approved' },
+                      { value: 'Ready for Pickup', label: 'Ready for Pickup' },
                       { value: 'Completed', label: 'Completed' },
                       { value: 'Rejected', label: 'Rejected' },
                       { value: 'Cancelled', label: 'Cancelled' },
@@ -1282,6 +1328,7 @@ function AdminManagementContent({ variant = 'superadmin' }) {
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               // Using a temporary variable to normalize status case for simpler check
                               ['COMPLETED', 'Completed'].includes(item.status) ? 'bg-green-100 text-green-800' :
+                              ['READY FOR PICKUP', 'Ready for Pickup'].includes(item.status) ? 'bg-[#eef3ff] text-[#122361]' :
                               ['PENDING', 'Pending'].includes(item.status) ? 'bg-yellow-100 text-yellow-800' :
                               ['APPROVED', 'Approved'].includes(item.status) ? 'bg-[#d8def2] text-[#122361]' :
                               ['REJECTED', 'Rejected'].includes(item.status) ? 'bg-red-100 text-red-800' :
@@ -1339,6 +1386,7 @@ function AdminManagementContent({ variant = 'superadmin' }) {
                   {(() => {
                     const item = data.find(d => (activeTab === 'document-requests' ? d.requestId : d.residentId) === openDropdownId);
                     if (!item) return null;
+                    const workflowStatus = normalizeWorkflowStatus(item.status);
 
                     return (
                       <div className="space-y-1">
@@ -1453,7 +1501,7 @@ function AdminManagementContent({ variant = 'superadmin' }) {
                               <Eye size={16} />
                               View Details
                             </button>
-                            {item.status === 'Pending' && (
+                            {workflowStatus === 'pending' && (
                               <>
                                 <button
                                   onClick={(e) => {
@@ -1461,7 +1509,7 @@ function AdminManagementContent({ variant = 'superadmin' }) {
                                     handleAccept(item);
                                     setOpenDropdownId(null);
                                   }}
-                                  className="w-full text-left px-3 py-2 text-sm text-green-700 hover:bg-green-50 rounded flex items-center gap-2"
+                                  className="w-full text-left px-3 py-2 text-sm font-semibold text-[#122361] hover:bg-[#eef3ff] rounded-lg flex items-center gap-2"
                                 >
                                   <CheckCircle size={16} />
                                   Approve
@@ -1472,21 +1520,34 @@ function AdminManagementContent({ variant = 'superadmin' }) {
                                     handleReject(item);
                                     setOpenDropdownId(null);
                                   }}
-                                  className="w-full text-left px-3 py-2 text-sm text-red-700 hover:bg-red-50 rounded flex items-center gap-2"
+                                  className="w-full text-left px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 rounded-lg flex items-center gap-2"
                                 >
                                   <XCircle size={16} />
                                   Reject
                                 </button>
                               </>
                             )}
-                            {item.status === 'Approved' && (
+                            {workflowStatus === 'approved' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReadyForPickupDocument(item);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm font-semibold text-[#122361] hover:bg-[#eef3ff] rounded-lg flex items-center gap-2"
+                              >
+                                <FileText size={16} />
+                                Mark Ready for Pick Up
+                              </button>
+                            )}
+                            {workflowStatus === 'ready-for-pickup' && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleCompleteDocument(item);
                                   setOpenDropdownId(null);
                                 }}
-                                className="w-full text-left px-3 py-2 text-sm text-[#122361] hover:bg-[#eef3ff] rounded flex items-center gap-2"
+                                className="w-full text-left px-3 py-2 text-sm font-semibold text-[#122361] hover:bg-[#eef3ff] rounded-lg flex items-center gap-2"
                               >
                                 <CheckCircle size={16} />
                                 Complete
@@ -1709,6 +1770,27 @@ function AdminManagementContent({ variant = 'superadmin' }) {
               fetchData(activeTab, true);
             }}
             cancelRequest={async () => ({ success: false, error: `Not supported in ${basePath} view` })}
+            readyForPickupRequest={async (requestId) => {
+              const token = localStorage.getItem('token');
+              const response = await fetch(`${apiBase}/requests/${requestId}/ready-for-pickup`, {
+                method: 'PUT',
+                headers: token ? {
+                  'Authorization': `Bearer ${token}`,
+                } : {},
+              });
+              const responseText = await response.text().catch(() => '');
+              if (!response.ok) {
+                throw new Error(responseText || 'Failed to mark request ready for pickup.');
+              }
+              if (!responseText.trim()) {
+                return {};
+              }
+              try {
+                return JSON.parse(responseText);
+              } catch {
+                return {};
+              }
+            }}
             completeRequest={async (requestId) => {
               const token = localStorage.getItem('token');
               const response = await fetch(`${apiBase}/requests/${requestId}/complete`, {
