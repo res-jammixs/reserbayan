@@ -1,36 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
-  Banknote,
-  BriefcaseBusiness,
-  Building2,
-  Clock3,
-  FileCheck2,
-  FileText,
   Filter,
   Grid3X3,
-  Home,
   PanelLeftOpen,
   Search,
-  ShieldCheck,
   SlidersHorizontal,
   Tags,
+  X,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useDocumentTypes } from '@/hooks/useDocumentTypes';
 import FilterDropdown from '@/shared/components/forms/FilterDropdown';
-
-const categoryStyles = {
-  'Financial Assistance': { icon: Banknote },
-  Residency: { icon: Home },
-  Clearance: { icon: ShieldCheck },
-  'Permits & Tax': { icon: BriefcaseBusiness },
-  'Infrastructure & Zoning': { icon: Building2 },
-};
 
 const sortOptions = [
   { value: 'recommended', label: 'Recommended' },
@@ -47,9 +32,12 @@ const processingFilters = [
   { value: 'variable', label: 'Variable' },
 ];
 
-function getCategoryIcon(category) {
-  return categoryStyles[category]?.icon || FileText;
-}
+const toolbarLayoutTransition = {
+  type: 'spring',
+  stiffness: 420,
+  damping: 34,
+  mass: 0.8,
+};
 
 function getProcessingMinutes(processingTime = '') {
   const normalizedProcessingTime = processingTime.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -106,10 +94,13 @@ function DocumentSidebar({ isOpen, onClose }) {
   const { documentsData } = useDocumentTypes();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const listRef = useRef(null);
+  const activeDocumentRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
   const [selectedCategory, setSelectedCategory] = useState(() => searchParams.get('category') || 'All');
   const [processingFilter, setProcessingFilter] = useState(() => searchParams.get('timeline') || 'All');
   const [sortBy, setSortBy] = useState(() => searchParams.get('sort') || 'recommended');
+  const hasActiveControls = selectedCategory !== 'All' || processingFilter !== 'All' || sortBy !== 'recommended';
 
   const categories = useMemo(() => [
     'All',
@@ -152,6 +143,29 @@ function DocumentSidebar({ isOpen, onClose }) {
   }, [processingFilter, searchQuery, selectedCategory, sortBy]);
 
   const backHref = queryString ? `/documents?${queryString}` : '/documents';
+  const clearControls = () => {
+    setSelectedCategory('All');
+    setProcessingFilter('All');
+    setSortBy('recommended');
+  };
+
+  useEffect(() => {
+    const listElement = listRef.current;
+    const activeElement = activeDocumentRef.current;
+
+    if (!listElement || !activeElement) {
+      return;
+    }
+
+    const listRect = listElement.getBoundingClientRect();
+    const activeRect = activeElement.getBoundingClientRect();
+    const targetTop = listElement.scrollTop + activeRect.top - listRect.top;
+
+    listElement.scrollTo({
+      top: Math.max(0, targetTop - 2),
+      behavior: 'smooth',
+    });
+  }, [filteredDocuments.length, isOpen, pathname]);
 
   return (
     <>
@@ -196,35 +210,67 @@ function DocumentSidebar({ isOpen, onClose }) {
             />
           </label>
 
-          <div className="mt-3 grid grid-cols-1 gap-2">
-            <FilterDropdown
-              icon={Tags}
-              options={categoryOptions}
-              value={selectedCategory}
-              onChange={setSelectedCategory}
-              ariaLabel="Filter documents by category"
-              size="md"
-              iconClassName="text-[#2f84c0]"
-            />
-            <FilterDropdown
-              icon={Filter}
-              options={processingFilters}
-              value={processingFilter}
-              onChange={setProcessingFilter}
-              ariaLabel="Filter documents by timeline"
-              size="md"
-              iconClassName="text-[#2f84c0]"
-            />
-            <FilterDropdown
-              icon={SlidersHorizontal}
-              options={sortOptions}
-              value={sortBy}
-              onChange={setSortBy}
-              ariaLabel="Sort documents"
-              size="md"
-              iconClassName="text-[#2f84c0]"
-            />
-          </div>
+          <motion.div layout className="mt-3 flex items-center gap-2">
+            <motion.div layout transition={toolbarLayoutTransition} className="min-w-0 flex-1">
+              <FilterDropdown
+                icon={Tags}
+                options={categoryOptions}
+                value={selectedCategory}
+                onChange={setSelectedCategory}
+                ariaLabel="Filter documents by category"
+                size="square"
+                iconOnly
+                active={selectedCategory !== 'All'}
+                iconClassName="text-[#2f84c0]"
+              />
+            </motion.div>
+            <motion.div layout transition={toolbarLayoutTransition} className="min-w-0 flex-1">
+              <FilterDropdown
+                icon={Filter}
+                options={processingFilters}
+                value={processingFilter}
+                onChange={setProcessingFilter}
+                ariaLabel="Filter documents by timeline"
+                size="square"
+                iconOnly
+                active={processingFilter !== 'All'}
+                iconClassName="text-[#2f84c0]"
+              />
+            </motion.div>
+            <motion.div layout transition={toolbarLayoutTransition} className="min-w-0 flex-1">
+              <FilterDropdown
+                icon={SlidersHorizontal}
+                options={sortOptions}
+                value={sortBy}
+                onChange={setSortBy}
+                ariaLabel="Sort documents"
+                size="square"
+                iconOnly
+                active={sortBy !== 'recommended'}
+                menuAlign="right"
+                iconClassName="text-[#2f84c0]"
+              />
+            </motion.div>
+            <AnimatePresence initial={false} mode="popLayout">
+              {hasActiveControls && (
+                <motion.button
+                  layout
+                  key="clear-document-controls"
+                  type="button"
+                  onClick={clearControls}
+                  aria-label="Clear document filters"
+                  title="Clear filters"
+                  initial={{ opacity: 0, scale: 0.82, x: 10 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.82, x: 10 }}
+                  transition={toolbarLayoutTransition}
+                  className="flex h-11 min-w-0 flex-1 items-center justify-center rounded-2xl border border-[#f0b6b6] bg-[#fff5f5] text-[#b42318] outline-none transition-colors hover:border-[#e59a9a] hover:bg-white focus:ring-4 focus:ring-[#f8d1d1]"
+                >
+                  <X className="h-4.5 w-4.5" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </motion.div>
         </div>
 
         <div className="mt-4 flex items-center justify-between px-1 text-xs font-bold uppercase tracking-wide text-slate-400">
@@ -232,39 +278,29 @@ function DocumentSidebar({ isOpen, onClose }) {
           <span>Filtered list</span>
         </div>
 
-        <ul className="mt-2 h-[calc(100vh-23rem)] space-y-2 overflow-y-auto pr-1">
+        <ul
+          ref={listRef}
+          className="mt-2 h-[calc(100vh-23rem)] space-y-2 overflow-y-auto pr-1 [scrollbar-color:#9eaddd_#eef3ff] [scrollbar-gutter:stable] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#9eaddd] [&::-webkit-scrollbar-thumb]:hover:bg-[#2f84c0] [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-[#eef3ff]"
+        >
           {filteredDocuments.map((doc) => {
             const isActive = pathname === `/documents/${doc.id}`;
-            const CategoryIcon = getCategoryIcon(doc.details?.category);
-            const requirementsCount = doc.details?.requirements?.length || 0;
             const href = queryString ? `/documents/${doc.id}?${queryString}` : `/documents/${doc.id}`;
 
             return (
-              <li key={doc.id}>
+              <li key={doc.id} ref={isActive ? activeDocumentRef : null}>
                 <Link
                   href={href}
                   onClick={onClose}
-                  className={`group flex items-center gap-3 rounded-2xl border p-3 transition-all ${
+                  className={`group block rounded-2xl border px-4 py-3 transition-all ${
                     isActive
-                      ? 'border-[#9eaddd] bg-[#243b8e] text-white shadow-[0_8px_18px_rgba(36,59,142,0.14)]'
-                      : 'border-slate-200 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-[#c2cbea] hover:bg-[#eef3ff]'
+                      ? 'border-[#9eaddd] bg-[#f4f7ff] text-[#122361] shadow-[0_6px_16px_rgba(36,59,142,0.10),inset_0_0_0_1px_rgba(36,59,142,0.06)]'
+                      : 'border-slate-200 bg-white text-slate-600 shadow-[0_3px_10px_rgba(15,23,42,0.035)] hover:border-[#c2cbea] hover:bg-[#fbfcff] hover:text-[#122361] hover:shadow-[0_6px_14px_rgba(15,23,42,0.06)]'
                   }`}
                 >
-                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                    isActive ? 'bg-white/15 text-white' : 'bg-[#eef3ff] text-[#122361]'
+                  <span className={`block font-[family-name:var(--font-montserrat)] text-sm leading-snug ${
+                    isActive ? 'font-extrabold' : 'font-bold'
                   }`}>
-                    <CategoryIcon className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-[family-name:var(--font-montserrat)] text-sm font-extrabold">{doc.name}</span>
-                    <span className={`mt-0.5 flex items-center gap-2 text-xs ${
-                      isActive ? 'text-[#eef3ff]' : 'text-slate-500'
-                    }`}>
-                      <Clock3 className="h-3.5 w-3.5" />
-                      {doc.details?.processingTime || 'TBD'}
-                      <FileCheck2 className="h-3.5 w-3.5" />
-                      {requirementsCount}
-                    </span>
+                    {doc.name}
                   </span>
                 </Link>
               </li>

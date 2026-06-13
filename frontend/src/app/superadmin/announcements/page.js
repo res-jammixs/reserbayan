@@ -3,7 +3,7 @@ import AnnouncementsManagement from '@/features/admin/announcements/Announcement
 export default function SuperAdminAnnouncementsPage() {
   return (
     <AnnouncementsManagement
-      apiBase="http://localhost:8080/api/superadmin"
+      apiBase="/api/superadmin"
       roleLabel="Super Admin"
     />
   );

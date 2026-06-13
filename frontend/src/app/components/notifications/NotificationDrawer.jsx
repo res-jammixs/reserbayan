@@ -122,7 +122,7 @@ export default function NotificationDrawer({ isOpen, onClose, role, user, onUnre
     }
 
     try {
-      const response = await fetch('http://localhost:8080/api/admin-notifications?category=all', {
+      const response = await fetch('/api/admin-notifications?category=all', {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) {
@@ -150,8 +150,8 @@ export default function NotificationDrawer({ isOpen, onClose, role, user, onUnre
 
     try {
       const endpoint = adminMode
-        ? `http://localhost:8080/api/admin-notifications?category=${activeFilter}`
-        : `http://localhost:8080/api/notifications/resident/${user.residentId}`;
+        ? `/api/admin-notifications?category=${activeFilter}`
+        : `/api/notifications/resident/${user.residentId}`;
 
       const response = await fetch(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
@@ -214,8 +214,8 @@ export default function NotificationDrawer({ isOpen, onClose, role, user, onUnre
     const token = localStorage.getItem('token');
     const notificationId = getNotificationId(notification);
     const endpoint = adminMode
-      ? `http://localhost:8080/api/admin-notifications/${notificationId}/read`
-      : `http://localhost:8080/api/notifications/${notificationId}/read`;
+      ? `/api/admin-notifications/${notificationId}/read`
+      : `/api/notifications/${notificationId}/read`;
 
     await fetch(endpoint, {
       method: 'PUT',
@@ -232,8 +232,8 @@ export default function NotificationDrawer({ isOpen, onClose, role, user, onUnre
   const markAllAsRead = async () => {
     const token = localStorage.getItem('token');
     const endpoint = adminMode
-      ? 'http://localhost:8080/api/admin-notifications/read-all'
-      : `http://localhost:8080/api/notifications/resident/${user.residentId}/read-all`;
+      ? '/api/admin-notifications/read-all'
+      : `/api/notifications/resident/${user.residentId}/read-all`;
 
     await fetch(endpoint, {
       method: 'PUT',
@@ -249,8 +249,8 @@ export default function NotificationDrawer({ isOpen, onClose, role, user, onUnre
     const token = localStorage.getItem('token');
     const notificationId = getNotificationId(notification);
     const endpoint = adminMode
-      ? `http://localhost:8080/api/admin-notifications/${notificationId}`
-      : `http://localhost:8080/api/notifications/${notificationId}`;
+      ? `/api/admin-notifications/${notificationId}`
+      : `/api/notifications/${notificationId}`;
 
     await fetch(endpoint, {
       method: 'DELETE',
@@ -265,8 +265,8 @@ export default function NotificationDrawer({ isOpen, onClose, role, user, onUnre
   const deleteAllNotifications = async () => {
     const token = localStorage.getItem('token');
     const endpoint = adminMode
-      ? 'http://localhost:8080/api/admin-notifications'
-      : `http://localhost:8080/api/notifications/resident/${user.residentId}`;
+      ? '/api/admin-notifications'
+      : `/api/notifications/resident/${user.residentId}`;
 
     await fetch(endpoint, {
       method: 'DELETE',
@@ -336,8 +336,8 @@ export default function NotificationDrawer({ isOpen, onClose, role, user, onUnre
     await Promise.all(unreadTargets.map((notification) => {
       const notificationId = getNotificationId(notification);
       const endpoint = adminMode
-        ? `http://localhost:8080/api/admin-notifications/${notificationId}/read`
-        : `http://localhost:8080/api/notifications/${notificationId}/read`;
+        ? `/api/admin-notifications/${notificationId}/read`
+        : `/api/notifications/${notificationId}/read`;
 
       return fetch(endpoint, {
         method: 'PUT',
@@ -374,8 +374,8 @@ export default function NotificationDrawer({ isOpen, onClose, role, user, onUnre
     await Promise.all(deleteTargets.map((notification) => {
       const notificationId = getNotificationId(notification);
       const endpoint = adminMode
-        ? `http://localhost:8080/api/admin-notifications/${notificationId}`
-        : `http://localhost:8080/api/notifications/${notificationId}`;
+        ? `/api/admin-notifications/${notificationId}`
+        : `/api/notifications/${notificationId}`;
 
       return fetch(endpoint, {
         method: 'DELETE',
@@ -408,7 +408,7 @@ export default function NotificationDrawer({ isOpen, onClose, role, user, onUnre
 
   const fetchDocumentRequest = async (requestId) => {
     const token = localStorage.getItem('token');
-    const response = await fetch(`http://localhost:8080/api/document-requests/${requestId}`, {
+    const response = await fetch(`/api/document-requests/${requestId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -481,7 +481,7 @@ export default function NotificationDrawer({ isOpen, onClose, role, user, onUnre
     const formData = new FormData();
     formData.append('data', JSON.stringify(dataPayload));
 
-    const response = await fetch('http://localhost:8080/api/document-requests', {
+    const response = await fetch('/api/document-requests', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
@@ -795,7 +795,7 @@ export default function NotificationDrawer({ isOpen, onClose, role, user, onUnre
           }}
           cancelRequest={async (requestId) => {
             const token = localStorage.getItem('token');
-            const response = await fetch(`http://localhost:8080/api/document-requests/${requestId}/cancel`, {
+            const response = await fetch(`/api/document-requests/${requestId}/cancel`, {
               method: 'PUT',
               headers: { Authorization: `Bearer ${token}` },
             });

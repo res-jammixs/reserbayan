@@ -16,7 +16,7 @@ export function useRequests(user) {
 
     try {
       console.log('Fetching requests for residentId:', user.residentId);
-      const response = await fetch(`http://localhost:8080/api/document-requests/resident/${user.residentId}`, {
+      const response = await fetch(`/api/document-requests/resident/${user.residentId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -52,7 +52,7 @@ export function useRequests(user) {
     }
 
     try {
-      const response = await fetch(`http://localhost:8080/api/document-requests/${requestId}/cancel`, {
+      const response = await fetch(`/api/document-requests/${requestId}/cancel`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

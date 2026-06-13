@@ -1,10 +1,13 @@
 package com.cagasi.reserbayan.config;
 
 import java.util.Arrays;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -24,6 +27,9 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    @Value("${app.cors.allowed-origin-patterns:http://localhost:3000,http://localhost:3001,http://localhost:3002}")
+    private String allowedOriginPatterns;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -41,7 +47,10 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/resubmit",
-                                "/api/document-types", "/api/document-types/**", "/uploads/**")
+                                "/api/residents/announcements", "/api/residents/announcements/**",
+                                "/uploads/**")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/document-types", "/api/document-types/**")
                         .permitAll()
                         .requestMatchers("/api/superadmin/**").authenticated()
                         .anyRequest().authenticated())
@@ -52,8 +61,13 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(
-                Arrays.asList("http://localhost:3000", "http://localhost:3001", "http://localhost:3002"));
+        List<String> origins = Arrays.stream(allowedOriginPatterns.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank())
+                .toList();
+        configuration.setAllowedOriginPatterns(origins.isEmpty()
+                ? List.of("http://localhost:3000", "http://localhost:3001", "http://localhost:3002")
+                : origins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);

@@ -8,7 +8,7 @@ import {
   Bell,
   ChevronDown,
   ClipboardList,
-  FileText,
+  FileBadge2,
   LayoutDashboard,
   LogOut,
   Megaphone,
@@ -20,22 +20,26 @@ import { useUser } from '@/contexts/UserContext';
 import NotificationDrawer from '@/app/components/notifications/NotificationDrawer';
 import ProfileDrawer from '@/app/components/profile/ProfileDrawer';
 
+function DocumentNavIcon(props) {
+  return <FileBadge2 {...props} strokeWidth={1.8} />;
+}
+
 const roleNavItems = {
   SUPER_ADMIN: [
     { href: '/superadmin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/superadmin/documents', label: 'Documents', icon: User },
+    { href: '/superadmin/documents', label: 'Documents', icon: DocumentNavIcon },
     { href: '/superadmin/management', label: 'Management', icon: ClipboardList },
     { href: '/superadmin/announcements', label: 'Announcements', icon: Megaphone },
   ],
   ADMIN: [
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/admin/documents', label: 'Documents', icon: User },
+    { href: '/admin/documents', label: 'Documents', icon: DocumentNavIcon },
     { href: '/admin/management', label: 'Management', icon: ClipboardList },
     { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
   ],
   RESIDENT: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/documents', label: 'Documents', icon: FileText },
+    { href: '/documents', label: 'Documents', icon: DocumentNavIcon },
     { href: '/requests', label: 'Requests', icon: ClipboardList },
     { href: '/announcements', label: 'Announcements', icon: Megaphone },
   ],

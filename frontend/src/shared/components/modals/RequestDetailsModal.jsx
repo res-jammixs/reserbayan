@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, User, FileText, Calendar, Clock, Info, Paperclip, Download, CheckCircle, XCircle } from 'lucide-react';
+import AiReviewPanel from '@/shared/components/ai/AiReviewPanel';
+import NotificationModal from '@/app/components/NotificationModal';
 
 export default function RequestDetailsModal({
   isOpen,
@@ -15,6 +17,7 @@ export default function RequestDetailsModal({
 }) {
   const [isDownloading, setIsDownloading] = useState({});
   const [attachments, setAttachments] = useState([]);
+  const [notification, setNotification] = useState(null);
 
   // Fetch attachments when requestDetails changes
   useEffect(() => {
@@ -32,7 +35,7 @@ export default function RequestDetailsModal({
       
       // Fetch the full request details including attachments
       const response = await fetch(
-        `http://localhost:8080/api/document-requests/${requestDetails.requestId}`,
+        `/api/document-requests/${requestDetails.requestId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -59,12 +62,16 @@ export default function RequestDetailsModal({
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        alert('Please log in again to download files.');
+        setNotification({
+          type: 'warning',
+          title: 'Login Required',
+          message: 'Please log in again to download files.',
+        });
         return;
       }
 
       const response = await fetch(
-        `http://localhost:8080/api/document-requests/${requestDetails.requestId}/attachments/${file.id}/download`,
+        `/api/document-requests/${requestDetails.requestId}/attachments/${file.id}/download`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -83,15 +90,27 @@ export default function RequestDetailsModal({
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
       } else if (response.status === 401) {
-        alert('Please log in again to download files.');
+        setNotification({
+          type: 'warning',
+          title: 'Login Required',
+          message: 'Please log in again to download files.',
+        });
       } else if (response.status === 403) {
-        alert('You do not have permission to download this file.');
+        setNotification({
+          type: 'error',
+          title: 'Access Denied',
+          message: 'You do not have permission to download this file.',
+        });
       } else {
         throw new Error('Download failed');
       }
     } catch (error) {
       console.error('Download error:', error);
-      alert('Failed to download file. Please try again.');
+      setNotification({
+        type: 'error',
+        title: 'Download Failed',
+        message: 'Failed to download file. Please try again.',
+      });
     } finally {
       // Clear downloading state
       setIsDownloading(prev => ({ ...prev, [file.id]: false }));
@@ -301,6 +320,8 @@ export default function RequestDetailsModal({
                 </div>
               )}
 
+              <AiReviewPanel requestId={requestDetails.id || requestDetails.requestId} />
+
               {/* Attachments - NEW SECURE DOWNLOAD SECTION */}
               {(attachments.length > 0 || requestDetails.attachmentCount > 0) && (
                 <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -409,6 +430,15 @@ export default function RequestDetailsModal({
           </div>
         )}
       </motion.div>
+
+      <NotificationModal
+        isOpen={!!notification}
+        onClose={() => setNotification(null)}
+        type={notification?.type}
+        title={notification?.title}
+        message={notification?.message}
+        zIndexClass="z-[70]"
+      />
     </div>
   );
 }

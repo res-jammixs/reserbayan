@@ -1,0 +1,6 @@
+target
+uploads
+*.log
+*.err.log
+classpath.txt
+src/main/resources/application.properties

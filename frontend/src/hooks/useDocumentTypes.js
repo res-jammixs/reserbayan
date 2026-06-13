@@ -8,7 +8,7 @@ export function useDocumentTypes() {
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/document-types');
+        const response = await fetch('/api/document-types');
         if (!response.ok) {
           throw new Error('Failed to fetch documents');
         }

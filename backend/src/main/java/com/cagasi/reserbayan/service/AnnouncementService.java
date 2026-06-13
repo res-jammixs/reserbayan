@@ -69,6 +69,27 @@ public class AnnouncementService {
                 .collect(Collectors.toList());
     }
 
+    public boolean isVisibleToResidents(Announcement announcement) {
+        if (announcement == null) {
+            return false;
+        }
+        if (announcement.getIsActive() == null || !announcement.getIsActive()) {
+            return false;
+        }
+        if (announcement.getIsVisible() == null || !announcement.getIsVisible()) {
+            return false;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startDate = announcement.getStartDate();
+        LocalDateTime endDate = announcement.getEndDate();
+
+        if (startDate != null && now.isBefore(startDate)) {
+            return false;
+        }
+        return endDate == null || !now.isAfter(endDate);
+    }
+
     // Get announcement by ID
     public Optional<Announcement> getAnnouncementById(Long id) {
         return announcementRepository.findById(id);

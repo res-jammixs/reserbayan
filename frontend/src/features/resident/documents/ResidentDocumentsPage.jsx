@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   ArrowRight,
@@ -9,6 +9,8 @@ import {
   Banknote,
   BriefcaseBusiness,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Clock3,
   FileBadge2,
@@ -25,6 +27,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useDocumentTypes } from '@/hooks/useDocumentTypes';
+import { useUser } from '@/contexts/UserContext';
 import FilterDropdown from '@/shared/components/forms/FilterDropdown';
 
 const categoryStyles = {
@@ -69,6 +72,8 @@ const processingFilters = [
   { value: 'multi-day', label: 'Multi-day' },
   { value: 'variable', label: 'Variable' },
 ];
+
+const DOCUMENTS_PER_PAGE = 9;
 
 function getCategoryConfig(category) {
   return categoryStyles[category] || {
@@ -134,7 +139,6 @@ function sortDocuments(documents, sortBy) {
 function DocumentIcon() {
   return (
     <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#00114e] via-[#243b8e] to-[#2f84c0] text-white shadow-[0_8px_18px_rgba(36,59,142,0.12)]">
-      <div className="absolute inset-1 rounded-[1rem] border border-white/20" />
       <FileBadge2 className="h-7 w-7" strokeWidth={1.8} />
     </div>
   );
@@ -263,14 +267,108 @@ function DocumentCard({ doc, viewMode, href }) {
   );
 }
 
+function DocumentPagination({ currentPage, totalPages, totalItems, onPageChange }) {
+  if (totalPages <= 1) {
+    return null;
+  }
+
+  const firstVisibleItem = (currentPage - 1) * DOCUMENTS_PER_PAGE + 1;
+  const lastVisibleItem = Math.min(currentPage * DOCUMENTS_PER_PAGE, totalItems);
+  const pages = Array.from({ length: totalPages }, (_, index) => index + 1)
+    .filter((page) => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1);
+
+  return (
+    <nav className="mt-6 flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white/90 p-3 shadow-[0_8px_20px_rgba(15,23,42,0.06)] sm:flex-row sm:items-center sm:justify-between" aria-label="Documents pagination">
+      <p className="px-2 text-sm font-semibold text-slate-500">
+        Showing <span className="text-[#122361]">{firstVisibleItem}-{lastVisibleItem}</span> of <span className="text-[#122361]">{totalItems}</span> documents
+      </p>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#122361] transition hover:border-[#9eaddd] hover:bg-[#eef3ff] disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Previous documents page"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+
+        {pages.map((page, index) => {
+          const previousPage = pages[index - 1];
+          const showGap = previousPage && page - previousPage > 1;
+
+          return (
+            <div key={page} className="flex items-center gap-2">
+              {showGap && <span className="text-sm font-bold text-slate-300">...</span>}
+              <button
+                type="button"
+                onClick={() => onPageChange(page)}
+                className={`h-10 min-w-10 rounded-2xl px-3 text-sm font-extrabold transition ${
+                  page === currentPage
+                    ? 'bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white shadow-[0_8px_18px_rgba(36,59,142,0.14)]'
+                    : 'border border-slate-200 bg-white text-slate-600 hover:border-[#9eaddd] hover:bg-[#eef3ff] hover:text-[#122361]'
+                }`}
+                aria-current={page === currentPage ? 'page' : undefined}
+              >
+                {page}
+              </button>
+            </div>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage === totalPages}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#122361] transition hover:border-[#9eaddd] hover:bg-[#eef3ff] disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Next documents page"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 function DocumentsGridContent() {
   const { documentsData, loading, error } = useDocumentTypes();
+  const { user } = useUser();
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
   const [selectedCategory, setSelectedCategory] = useState(() => searchParams.get('category') || 'All');
   const [processingFilter, setProcessingFilter] = useState(() => searchParams.get('timeline') || 'All');
   const [sortBy, setSortBy] = useState(() => searchParams.get('sort') || 'recommended');
   const [viewMode, setViewMode] = useState(() => searchParams.get('view') || 'grid');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recommendedDocuments, setRecommendedDocuments] = useState([]);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const fetchRecommendations = async () => {
+      setRecommendationsLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (user?.residentId) params.set('residentId', user.residentId);
+        const response = await fetch(`/api/document-types/recommended${params.toString() ? `?${params.toString()}` : ''}`);
+        if (!response.ok) throw new Error('Failed to fetch recommendations');
+        const data = await response.json();
+        if (!ignore) setRecommendedDocuments(data || []);
+      } catch (fetchError) {
+        if (!ignore) setRecommendedDocuments([]);
+      } finally {
+        if (!ignore) setRecommendationsLoading(false);
+      }
+    };
+
+    fetchRecommendations();
+
+    return () => {
+      ignore = true;
+    };
+  }, [user?.residentId]);
 
   const categories = useMemo(() => [
     'All',
@@ -280,11 +378,19 @@ function DocumentsGridContent() {
     value: category,
     label: category === 'All' ? 'All categories' : category,
   })), [categories]);
+  const recommendedDocumentIds = useMemo(
+    () => new Set(recommendedDocuments.map((doc) => doc.id)),
+    [recommendedDocuments],
+  );
 
   const filteredDocuments = useMemo(() => {
     const normalizedSearchQuery = searchQuery.toLowerCase().trim();
 
     const documents = documentsData.filter((doc) => {
+      if (recommendedDocumentIds.has(doc.id)) {
+        return false;
+      }
+
       const searchableText = [
         doc.name,
         doc.shortDescription,
@@ -299,10 +405,31 @@ function DocumentsGridContent() {
     });
 
     return sortDocuments(documents, sortBy);
-  }, [documentsData, processingFilter, searchQuery, selectedCategory, sortBy]);
+  }, [documentsData, processingFilter, recommendedDocumentIds, searchQuery, selectedCategory, sortBy]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / DOCUMENTS_PER_PAGE));
+  const paginatedDocuments = useMemo(() => {
+    const startIndex = (currentPage - 1) * DOCUMENTS_PER_PAGE;
+    return filteredDocuments.slice(startIndex, startIndex + DOCUMENTS_PER_PAGE);
+  }, [currentPage, filteredDocuments]);
+  const showRecommendations = currentPage === 1 && (recommendationsLoading || recommendedDocuments.length > 0);
   const totalCategories = Math.max(categories.length - 1, 0);
   const activeFiltersCount = [selectedCategory !== 'All', processingFilter !== 'All', searchQuery.trim() !== ''].filter(Boolean).length;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [processingFilter, searchQuery, selectedCategory, sortBy]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 420, behavior: 'smooth' });
+    }
+  };
 
   const documentQueryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -440,6 +567,48 @@ function DocumentsGridContent() {
          
         </div>
 
+        {showRecommendations && (
+          <motion.section
+            className="mt-6"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+          >
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-extrabold uppercase tracking-wide text-[#122361]">
+                Suggested for you
+              </h2>
+              <div className="h-px flex-1 bg-[#d8def2]" />
+            </div>
+
+            {recommendationsLoading ? (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {[0, 1, 2].map((item) => (
+                  <div key={item} className="h-36 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+                ))}
+              </div>
+            ) : (
+              <motion.div
+                className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+                initial={{ opacity: 0, y: 32 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.18, ease: 'easeOut' }}
+              >
+                {recommendedDocuments.slice(0, 3).map((doc) => (
+                  <DocumentCard
+                    key={`recommended-${doc.id}`}
+                    doc={doc}
+                    viewMode="grid"
+                    href={`/documents/${doc.id}?${documentQueryString}`}
+                  />
+                ))}
+              </motion.div>
+            )}
+          </motion.section>
+        )}
+
+        <div className="mt-8 h-px bg-[#d8def2]" aria-hidden="true" />
+
         {filteredDocuments.length === 0 ? (
           <motion.div
             className="mt-8 rounded-3xl border border-dashed border-slate-300 bg-white/85 p-12 text-center shadow-[0_8px_20px_rgba(15,23,42,0.08)]"
@@ -460,7 +629,7 @@ function DocumentsGridContent() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.18, ease: 'easeOut' }}
           >
-            {filteredDocuments.map((doc) => (
+            {paginatedDocuments.map((doc) => (
               <DocumentCard
                 key={doc.id}
                 doc={doc}
@@ -469,6 +638,15 @@ function DocumentsGridContent() {
               />
             ))}
           </motion.div>
+        )}
+
+        {filteredDocuments.length > 0 && (
+          <DocumentPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredDocuments.length}
+            onPageChange={handlePageChange}
+          />
         )}
       </div>
     </motion.main>

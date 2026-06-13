@@ -190,7 +190,7 @@ export default function AccountActivityModal({ isOpen, onClose, user, onResubmit
           // Handle resubmission
           try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:8080/api/auth/resubmit', {
+            const response = await fetch('/api/auth/resubmit', {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`,

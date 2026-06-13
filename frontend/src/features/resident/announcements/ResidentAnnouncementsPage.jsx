@@ -9,6 +9,26 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageFade from '@/shared/components/motion/PageFade';
+import FilterDropdown from '@/shared/components/forms/FilterDropdown';
+
+function isAnnouncementVisibleNow(announcement) {
+  const now = new Date();
+  const startDate = announcement?.startDate ? new Date(announcement.startDate) : null;
+  const endDate = announcement?.endDate ? new Date(announcement.endDate) : null;
+
+  if (startDate && now < startDate) return false;
+  if (endDate && now > endDate) return false;
+
+  return true;
+}
+
+const priorityOptions = [
+  { value: 'ALL', label: 'All Priorities' },
+  { value: 'URGENT', label: 'Urgent' },
+  { value: 'HIGH', label: 'High' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'LOW', label: 'Low' },
+];
 
 export default function AnnouncementsPage() {
   const router = useRouter();
@@ -30,7 +50,7 @@ export default function AnnouncementsPage() {
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
 
   // API base URL
-  const API_BASE = 'http://localhost:8080/api/residents';
+  const API_BASE = '/api/residents';
 
   // Show notification helper
   const showNotification = (message, type = 'success') => {
@@ -81,22 +101,24 @@ export default function AnnouncementsPage() {
       if (response.ok) {
         const data = await response.json();
         console.log('Announcements response:', data);
+        const activeAnnouncements = (data.announcements || []).filter(isAnnouncementVisibleNow);
         
         if (append) {
-          setAnnouncements(prev => [...prev, ...data.announcements]);
+          setAnnouncements(prev => [...prev, ...activeAnnouncements]);
         } else {
-          setAnnouncements(data.announcements || []);
+          setAnnouncements(activeAnnouncements);
         }
         
         setCurrentPage(data.currentPage || 0);
         setTotalPages(data.totalPages || 0);
-        setTotalItems(data.totalItems || 0);
+        setTotalItems(data.totalItems || activeAnnouncements.length);
         setHasNext(data.hasNext || false);
         setHasPrevious(data.hasPrevious || false);
         
         // Set filtered announcements directly from API response
-        const filtered = data.announcements || [];
-        setFilteredAnnouncements(filtered);
+        setFilteredAnnouncements((currentAnnouncements) => (
+          append ? [...currentAnnouncements, ...activeAnnouncements] : activeAnnouncements
+        ));
       } else if (response.status === 401) {
         // Token expired or invalid
         console.log('Token expired, redirecting to login');
@@ -370,17 +392,16 @@ export default function AnnouncementsPage() {
             </div>
 
             {/* Priority Filter */}
-            <select
+            <FilterDropdown
+              icon={Megaphone}
+              options={priorityOptions}
               value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-[#2f84c0] focus:ring-2 focus:ring-[#d8def2]"
-            >
-              <option value="ALL">All Priorities</option>
-              <option value="URGENT">Urgent</option>
-              <option value="HIGH">High</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="LOW">Low</option>
-            </select>
+              onChange={setPriorityFilter}
+              ariaLabel="Filter announcements by priority"
+              size="form"
+              surface="white"
+              iconClassName="text-[#8aa0bf]"
+            />
           </div>
           
           {/* Results Count */}

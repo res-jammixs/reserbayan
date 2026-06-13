@@ -15,6 +15,11 @@ public class RequestAttachment {
     private String fileType;
     private String filePath; // We store the path/URL, not the file itself
     private Long fileSize; // File size in bytes
+    private String uploadGroup;
+    private Integer requirementIndex;
+
+    @Column(columnDefinition = "TEXT")
+    private String requirementLabel;
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
@@ -79,5 +84,29 @@ public class RequestAttachment {
 
     public void setFileSize(Long fileSize) {
         this.fileSize = fileSize;
+    }
+
+    public String getUploadGroup() {
+        return uploadGroup;
+    }
+
+    public void setUploadGroup(String uploadGroup) {
+        this.uploadGroup = uploadGroup;
+    }
+
+    public Integer getRequirementIndex() {
+        return requirementIndex;
+    }
+
+    public void setRequirementIndex(Integer requirementIndex) {
+        this.requirementIndex = requirementIndex;
+    }
+
+    public String getRequirementLabel() {
+        return requirementLabel;
+    }
+
+    public void setRequirementLabel(String requirementLabel) {
+        this.requirementLabel = requirementLabel;
     }
 }

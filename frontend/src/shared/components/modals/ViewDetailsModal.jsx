@@ -58,7 +58,7 @@ export default function ViewDetailsModal({ isOpen, onClose, resident, documentRe
   const isPending = statusLower === 'pending';
 
   const validIdUrl = actualResident.validIdPath
-    ? `http://localhost:8080/${actualResident.validIdPath.replace(/\\/g, '/')}`
+    ? `/${actualResident.validIdPath.replace(/\\/g, '/')}`
     : '';
 
   const addressSummary = [
@@ -426,7 +426,7 @@ export default function ViewDetailsModal({ isOpen, onClose, resident, documentRe
             <div className="max-h-[80vh] overflow-auto p-4">
               {expandedAttachment.fileType?.startsWith('image/') ? (
                 <img
-                  src={`http://localhost:8080/uploads/${expandedAttachment.filePath?.replace(/\\/g, '/')}`}
+                  src={`/uploads/${expandedAttachment.filePath?.replace(/\\/g, '/')}`}
                   alt={expandedAttachment.fileName || 'Attachment'}
                   className="h-auto w-full object-contain"
                   onError={(event) => {
@@ -439,7 +439,7 @@ export default function ViewDetailsModal({ isOpen, onClose, resident, documentRe
                   <div className="mb-4 text-6xl">📄</div>
                   <p className="mb-4 text-slate-600">This file type cannot be previewed directly.</p>
                   <a
-                    href={`http://localhost:8080/uploads/${expandedAttachment.filePath?.replace(/\\/g, '/')}`}
+                    href={`/uploads/${expandedAttachment.filePath?.replace(/\\/g, '/')}`}
                     download={expandedAttachment.fileName}
                     className="inline-flex items-center rounded-lg bg-[#243b8e] px-4 py-2 text-white transition-colors hover:bg-[#122361]"
                   >

@@ -8,7 +8,7 @@ import RejectionReasonModal from '@/shared/components/modals/RejectionReasonModa
 import { getResponseErrorMessage, getStoredJson } from '@/shared/lib/api';
 
 export default function AdminDashboardPage({
-  apiBase = 'http://localhost:8080/api/admin',
+  apiBase = '/api/admin',
   basePath = 'admin',
   allowedRoles = ['ADMIN', 'SUPER_ADMIN'],
   redirectForRole = {},

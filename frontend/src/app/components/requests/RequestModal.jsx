@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { FileText, Calendar, XCircle, Paperclip, Edit2, Save, Trash2, Plus, RotateCcw, Mail, MapPin, Phone, User, CheckCircle } from 'lucide-react';
+import { Ban, FileText, Calendar, XCircle, Paperclip, Edit2, Save, Trash2, Plus, RotateCcw, Mail, MapPin, Phone, User, CheckCircle } from 'lucide-react';
 import NotificationModal from '@/app/components/NotificationModal';
 import ConfirmationModal from '@/shared/components/modals/ConfirmationModal';
 import RejectionReasonModal from '@/shared/components/modals/RejectionReasonModal';
+import AiReviewPanel from '@/shared/components/ai/AiReviewPanel';
+import { motion } from 'framer-motion';
 
 function RequestModal({ request, user, onClose, cancelRequest, completeRequest, approveRequest, rejectRequest, onReRequest, onUpdateRequest }) {
   const [notification, setNotification] = useState(null);
@@ -89,7 +91,7 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
       }
 
       const response = await fetch(
-        `http://localhost:8080/api/document-requests/${displayRequest.requestId}/attachments/${file.id}/download`,
+        `/api/document-requests/${displayRequest.requestId}/attachments/${file.id}/download`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -150,7 +152,7 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
       title: 'Cancel Request',
       message: 'Are you sure you want to cancel this request?',
       confirmText: 'Cancel Request',
-      confirmButtonClass: 'bg-red-600 hover:bg-red-700',
+      confirmButtonClass: 'bg-red-500 hover:bg-red-600',
       onConfirm: async () => {
         const result = await cancelRequest(displayRequest.requestId);
         if (result.success) {
@@ -178,7 +180,7 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
       onConfirm: async () => {
         try {
           const token = localStorage.getItem('token');
-          const res = await fetch(`http://localhost:8080/api/document-requests/${displayRequest.requestId}/approve`, {
+          const res = await fetch(`/api/document-requests/${displayRequest.requestId}/approve`, {
             method: 'PUT',
             headers: { 'Authorization': `Bearer ${token}` },
           });
@@ -208,7 +210,7 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
     setIsRejecting(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:8080/api/document-requests/${displayRequest.requestId}/reject`, {
+      const res = await fetch(`/api/document-requests/${displayRequest.requestId}/reject`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -296,7 +298,7 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
             const formData = new FormData();
             formData.append('data', JSON.stringify(dataPayload));
 
-            const res = await fetch('http://localhost:8080/api/document-requests', {
+            const res = await fetch('/api/document-requests', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData,
@@ -355,7 +357,7 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
             formData.append('files', file);
         });
 
-        const res = await fetch(`http://localhost:8080/api/document-requests/${displayRequest.requestId}`, {
+        const res = await fetch(`/api/document-requests/${displayRequest.requestId}`, {
             method: 'PUT', 
             headers: { 'Authorization': `Bearer ${token}` },
             body: formData
@@ -396,11 +398,26 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
   };
 
   return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <motion.div
+      className="fixed inset-0 z-50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+    >
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} aria-hidden="true"></div>
 
       <div className="relative mx-auto flex h-full max-w-7xl items-center justify-center p-2">
-        <div className="w-full overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-sm max-h-[97vh] sm:max-h-[94vh]">
+        <motion.div
+          className="w-full overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-sm max-h-[97vh] sm:max-h-[94vh]"
+          initial={{ opacity: 0, y: 18, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 12, scale: 0.98 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+        >
          
         <div className="sticky top-0 z-10 border-b border-gray-200 bg-gradient-to-r from-[#eef3ff] to-white p-3 sm:p-4">
           <div className="flex items-center justify-between">
@@ -590,6 +607,10 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                   </div>
                 )}
               </div>
+
+              {!isEditing && user === null && (
+                <AiReviewPanel requestId={displayRequest.requestId} />
+              )}
             </div>
 
             <aside className="space-y-2">
@@ -680,22 +701,24 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                  {user !== null && displayRequest.status?.toLowerCase() === 'pending' && (
                     <button
                     onClick={handleCancelRequest}
-                    className="rounded-lg bg-red-600 px-5 py-2 font-medium text-white shadow-sm transition-colors hover:bg-red-700"
+                    className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-5 py-2 font-medium text-red-700 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100"
                     >
+                    <Ban className="h-4 w-4" aria-hidden="true" />
                     Cancel Request
                     </button>
                  )}
 
                  <button
                     onClick={onClose}
-                    className="rounded-lg border border-gray-300 bg-white px-5 py-2 font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2 font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
                  >
+                    <XCircle className="h-4 w-4" aria-hidden="true" />
                     Close
                  </button>
              </>
           )}
         </div>
-        </div>
+        </motion.div>
       </div>
 
       {notification && (
@@ -728,7 +751,7 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
         itemName={displayRequest.documentName}
         loading={isRejecting}
       />
-    </div>
+    </motion.div>
   );
 }
 

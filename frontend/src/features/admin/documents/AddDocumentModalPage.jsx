@@ -322,7 +322,7 @@ export default function AddDocumentModalPage({
     uploadFormData.append('file', file);
 
     const token = localStorage.getItem('token');
-    const response = await fetch('http://localhost:8080/api/document-types/upload', {
+    const response = await fetch('/api/document-types/upload', {
       method: 'POST',
       body: uploadFormData,
       ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
@@ -372,7 +372,7 @@ export default function AddDocumentModalPage({
         },
       };
 
-      const response = await fetch('http://localhost:8080/api/document-types', {
+      const response = await fetch('/api/document-types', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

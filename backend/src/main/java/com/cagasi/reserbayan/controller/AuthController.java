@@ -7,6 +7,7 @@ import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -39,6 +40,9 @@ public class AuthController {
 
     @Autowired
     private AdminNotificationService adminNotificationService;
+
+    @Value("${app.upload.dir:uploads}")
+    private String uploadDir;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
@@ -206,8 +210,7 @@ public class AuthController {
                         // Delete old file if exists
                         if (existingResident.getValidIdPath() != null && !existingResident.getValidIdPath().isEmpty()) {
                             try {
-                                java.nio.file.Path oldFilePath = java.nio.file.Paths
-                                        .get(existingResident.getValidIdPath());
+                                java.nio.file.Path oldFilePath = resolveUploadPath(existingResident.getValidIdPath());
                                 if (java.nio.file.Files.exists(oldFilePath)) {
                                     java.nio.file.Files.delete(oldFilePath);
                                 }
@@ -218,13 +221,11 @@ public class AuthController {
                         }
 
                         // Save new file
-                        String uploadDir = System.getProperty("user.dir") + "/uploads/resident/";
-                        java.nio.file.Path uploadPath = java.nio.file.Paths.get(uploadDir);
+                        java.nio.file.Path uploadPath = uploadPath("resident");
                         if (!java.nio.file.Files.exists(uploadPath)) {
                             java.nio.file.Files.createDirectories(uploadPath);
                         }
-                        String fileName = java.util.UUID.randomUUID().toString() + "_"
-                                + validIdFile.getOriginalFilename();
+                        String fileName = createStoredFileName(validIdFile.getOriginalFilename());
                         java.nio.file.Path filePath = uploadPath.resolve(fileName);
                         java.nio.file.Files.copy(validIdFile.getInputStream(), filePath,
                                 java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -284,5 +285,28 @@ public class AuthController {
         public void setPassword(String password) {
             this.password = password;
         }
+    }
+
+    private java.nio.file.Path uploadPath(String folder) {
+        return java.nio.file.Paths.get(uploadDir).toAbsolutePath().normalize().resolve(folder);
+    }
+
+    private java.nio.file.Path resolveUploadPath(String storedPath) {
+        if (storedPath == null || storedPath.isBlank()) {
+            return uploadPath("resident");
+        }
+        String normalizedPath = storedPath.replace("\\", "/");
+        if (normalizedPath.startsWith("uploads/")) {
+            normalizedPath = normalizedPath.substring("uploads/".length());
+        }
+        return java.nio.file.Paths.get(uploadDir).toAbsolutePath().normalize().resolve(normalizedPath);
+    }
+
+    private String createStoredFileName(String originalFilename) {
+        String safeName = originalFilename == null || originalFilename.isBlank()
+                ? "upload"
+                : java.nio.file.Paths.get(originalFilename).getFileName().toString();
+        safeName = safeName.replaceAll("[^A-Za-z0-9._-]", "_");
+        return java.util.UUID.randomUUID() + "_" + safeName;
     }
 }
