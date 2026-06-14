@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -73,8 +74,12 @@ public class DocumentTypeController {
     }
 
     @PostMapping
-    public ResponseEntity<DocumentTypeDTO> createDocumentType(@RequestBody DocumentTypeDTO dto) {
+    public ResponseEntity<?> createDocumentType(@RequestBody DocumentTypeDTO dto) {
         DocumentType entity = convertToEntity(dto);
+        String validationError = validateHardCopySettings(entity);
+        if (validationError != null) {
+            return ResponseEntity.badRequest().body(validationError);
+        }
         entity.setActive(true);
         DocumentType saved = documentTypeRepository.save(entity);
         DocumentTypeDTO responseDto = convertToDTO(saved);
@@ -82,11 +87,15 @@ public class DocumentTypeController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<DocumentTypeDTO> updateDocumentType(@PathVariable Long id, @RequestBody DocumentTypeDTO dto) {
+    public ResponseEntity<?> updateDocumentType(@PathVariable Long id, @RequestBody DocumentTypeDTO dto) {
         Optional<DocumentType> existing = documentTypeRepository.findById(id);
         if (existing.isPresent()) {
             DocumentType entity = existing.get();
             updateEntityFromDTO(entity, dto);
+            String validationError = validateHardCopySettings(entity);
+            if (validationError != null) {
+                return ResponseEntity.badRequest().body(validationError);
+            }
             DocumentType saved = documentTypeRepository.save(entity);
             DocumentTypeDTO responseDto = convertToDTO(saved);
             return ResponseEntity.ok(responseDto);
@@ -152,11 +161,18 @@ public class DocumentTypeController {
         details.setLongDescription(entity.getLongDescription());
         details.setProcessingTime(entity.getProcessingTime());
         details.setPdfPath(entity.getPdfPath());
+        details.setHardCopySubmissionRequired(entity.isHardCopySubmissionRequired());
 
         try {
             if (entity.getRequirements() != null) {
                 List<String> requirements = objectMapper.readValue(entity.getRequirements(), new TypeReference<List<String>>() {});
                 details.setRequirements(requirements);
+            }
+            if (entity.getHardCopyRequirements() != null) {
+                List<String> hardCopyRequirements = objectMapper.readValue(entity.getHardCopyRequirements(), new TypeReference<List<String>>() {});
+                details.setHardCopyRequirements(hardCopyRequirements);
+            } else {
+                details.setHardCopyRequirements(List.of());
             }
             if (entity.getUses() != null) {
                 List<String> uses = objectMapper.readValue(entity.getUses(), new TypeReference<List<String>>() {});
@@ -192,11 +208,14 @@ public class DocumentTypeController {
             entity.setProcessingTime(dto.getDetails().getProcessingTime());
             entity.setProcessingDays(parseProcessingDays(dto.getDetails().getProcessingTime()));
             entity.setPdfPath(dto.getDetails().getPdfPath());
+            entity.setHardCopySubmissionRequired(Boolean.TRUE.equals(dto.getDetails().getHardCopySubmissionRequired()));
 
             try {
                 if (dto.getDetails().getRequirements() != null) {
                     entity.setRequirements(objectMapper.writeValueAsString(dto.getDetails().getRequirements()));
                 }
+                entity.setHardCopyRequirements(objectMapper.writeValueAsString(
+                        normalizeList(dto.getDetails().getHardCopyRequirements())));
                 if (dto.getDetails().getUses() != null) {
                     entity.setUses(objectMapper.writeValueAsString(dto.getDetails().getUses()));
                 }
@@ -225,10 +244,17 @@ public class DocumentTypeController {
                 entity.setProcessingDays(parseProcessingDays(dto.getDetails().getProcessingTime()));
             }
             if (dto.getDetails().getPdfPath() != null) entity.setPdfPath(dto.getDetails().getPdfPath());
+            if (dto.getDetails().getHardCopySubmissionRequired() != null) {
+                entity.setHardCopySubmissionRequired(Boolean.TRUE.equals(dto.getDetails().getHardCopySubmissionRequired()));
+            }
 
             try {
                 if (dto.getDetails().getRequirements() != null) {
                     entity.setRequirements(objectMapper.writeValueAsString(dto.getDetails().getRequirements()));
+                }
+                if (dto.getDetails().getHardCopyRequirements() != null) {
+                    entity.setHardCopyRequirements(objectMapper.writeValueAsString(
+                            normalizeList(dto.getDetails().getHardCopyRequirements())));
                 }
                 if (dto.getDetails().getUses() != null) {
                     entity.setUses(objectMapper.writeValueAsString(dto.getDetails().getUses()));
@@ -236,6 +262,48 @@ public class DocumentTypeController {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+        }
+    }
+
+    private List<String> normalizeList(List<String> values) {
+        if (values == null) {
+            return new ArrayList<>();
+        }
+        return values.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .toList();
+    }
+
+    private String validateHardCopySettings(DocumentType entity) {
+        List<String> requirements = parseStoredList(entity.getRequirements());
+        List<String> hardCopyRequirements = parseStoredList(entity.getHardCopyRequirements());
+        if (!entity.isHardCopySubmissionRequired()) {
+            try {
+                entity.setHardCopyRequirements(objectMapper.writeValueAsString(List.of()));
+            } catch (Exception e) {
+                entity.setHardCopyRequirements("[]");
+            }
+            return null;
+        }
+
+        if (hardCopyRequirements.isEmpty()) {
+            return "At least one hard-copy requirement is required when hard-copy submission is enabled.";
+        }
+        if (!requirements.containsAll(hardCopyRequirements)) {
+            return "Hard-copy requirements must be selected from the existing document requirements.";
+        }
+        return null;
+    }
+
+    private List<String> parseStoredList(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return normalizeList(objectMapper.readValue(json, new TypeReference<List<String>>() {}));
+        } catch (Exception e) {
+            return List.of();
         }
     }
 

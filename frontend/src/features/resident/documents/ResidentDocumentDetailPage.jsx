@@ -52,6 +52,8 @@ function DocumentDetailContent({ params }) {
   }
 
   const requirements = doc.details?.requirements || [];
+  const hardCopySubmissionRequired = Boolean(doc.details?.hardCopySubmissionRequired);
+  const hardCopyRequirements = doc.details?.hardCopyRequirements || [];
   const uses = doc.details?.uses || [];
   const imageSource = doc.imagePath.startsWith('/uploads/')
     ? doc.imagePath
@@ -108,7 +110,7 @@ function DocumentDetailContent({ params }) {
               {doc.details?.longDescription || doc.shortDescription}
             </p>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="mt-5 grid gap-3 sm:grid-cols-4">
               <div className="rounded-2xl border border-[#d8def2] bg-[#eef3ff]/70 p-4">
                 <Clock3 className="h-5 w-5 text-[#122361]" />
                 <p className="mt-2 text-xs font-bold uppercase tracking-wide text-[#2f84c0]">Processing</p>
@@ -128,7 +130,34 @@ function DocumentDetailContent({ params }) {
                 <p className="mt-2 text-xs font-bold uppercase tracking-wide text-[#2f84c0]">Status</p>
                 <p className="mt-1 text-sm font-extrabold text-slate-800">Ready to request</p>
               </div>
+              <div className="rounded-2xl border border-[#d8def2] bg-white p-4 shadow-sm">
+                <FileText className="h-5 w-5 text-[#122361]" />
+                <p className="mt-2 text-xs font-bold uppercase tracking-wide text-[#2f84c0]">Hard Copy</p>
+                <p className="mt-1 text-sm font-extrabold text-slate-800">
+                  {hardCopySubmissionRequired ? 'Required' : 'Not required'}
+                </p>
+              </div>
             </div>
+
+            {hardCopySubmissionRequired && (
+              <div className="mt-5 rounded-3xl border border-[#c2cbea] bg-[#eef3ff]/60 p-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-[#122361]" />
+                  <h2 className="text-lg font-extrabold text-[#122361]">Hard Copy Submission</h2>
+                </div>
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  These requirements must be submitted physically at the barangay office after your request is verified.
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {hardCopyRequirements.map((requirement, index) => (
+                    <li key={`hard-copy-${requirement}-${index}`} className="flex gap-2 text-sm font-semibold leading-6 text-slate-700">
+                      <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-600" />
+                      {requirement}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
               <div className="flex items-center gap-2">
@@ -244,6 +273,22 @@ function DocumentDetailContent({ params }) {
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
                     No listed requirements for this document.
+                  </div>
+                )}
+                {hardCopySubmissionRequired && (
+                  <div className="mt-4 rounded-2xl border border-[#c2cbea] bg-[#eef3ff]/70 p-4">
+                    <p className="text-xs font-extrabold uppercase tracking-wide text-[#243b8e]">Hard Copy Submission</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-600">
+                      Submit these physically at the barangay office after staff verifies the request.
+                    </p>
+                    <ul className="mt-3 space-y-2">
+                      {hardCopyRequirements.map((requirement, index) => (
+                        <li key={`modal-hard-copy-${requirement}-${index}`} className="flex gap-2 text-sm font-semibold leading-6 text-slate-700">
+                          <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-600" />
+                          {requirement}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>

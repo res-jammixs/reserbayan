@@ -51,6 +51,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @RequestMapping("/api/document-requests")
 public class DocumentRequestController {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @Autowired
     private DocumentRequestRepository documentRequestRepository;
 
@@ -171,6 +173,8 @@ public class DocumentRequestController {
 
             DocumentRequest documentRequest = new DocumentRequest();
             documentRequest.setDocumentType(documentType); // This will also set documentId and documentName via the setter
+            documentRequest.setHardCopySubmissionRequired(documentType.isHardCopySubmissionRequired());
+            documentRequest.setHardCopyRequirements(normalizedStoredRequirements(documentType.getHardCopyRequirements()));
             documentRequest.setResident(resident);
             documentRequest.setDetails(dto.getDetails());
             documentRequest.setStatus("Pending");
@@ -441,21 +445,25 @@ public class DocumentRequestController {
                 return ResponseEntity.status(HttpStatus.CONFLICT).body("Request must be pending before approval");
             }
 
-            documentRequest.setStatus("Approved");
+            boolean needsHardCopy = documentRequest.isHardCopySubmissionRequired();
+            String nextStatus = needsHardCopy ? "Awaiting Hard Copy Submission" : "Approved";
+            documentRequest.setStatus(nextStatus);
             documentRequest.setUpdatedAt(java.time.LocalDateTime.now());
             DocumentRequest savedRequest = documentRequestRepository.save(documentRequest);
 
             StatusLog statusLog = new StatusLog();
             statusLog.setDocumentRequest(savedRequest);
-            statusLog.setStatus("Approved");
+            statusLog.setStatus(nextStatus);
             statusLog.setTimestamp(java.time.LocalDateTime.now());
             statusLogRepository.save(statusLog);
 
             notificationService.createNotification(
                     savedRequest.getResident(),
-                    "Document Request Approved",
-                    "Your request for '" + savedRequest.getDocumentName() + "' has been verified and is being prepared.",
-                    "REQUEST_APPROVED",
+                    needsHardCopy ? "Hard Copy Requirements Needed" : "Document Request Approved",
+                    needsHardCopy
+                            ? "Your request for '" + savedRequest.getDocumentName() + "' has been verified. Please submit the required hard-copy documents at the barangay office."
+                            : "Your request for '" + savedRequest.getDocumentName() + "' has been verified and is being prepared.",
+                    needsHardCopy ? "REQUEST_HARD_COPY_REQUIRED" : "REQUEST_APPROVED",
                     null,
                     "DOCUMENT_REQUEST",
                     savedRequest.getRequestId());
@@ -480,8 +488,12 @@ public class DocumentRequestController {
             }
 
             DocumentRequest documentRequest = optionalRequest.get();
-            if (!"Approved".equals(documentRequest.getStatus())) {
-                return ResponseEntity.status(HttpStatus.CONFLICT).body("Request must be approved before pickup");
+            String requiredStatus = documentRequest.isHardCopySubmissionRequired() ? "Hard Copy Submitted" : "Approved";
+            if (!requiredStatus.equals(documentRequest.getStatus())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                        documentRequest.isHardCopySubmissionRequired()
+                                ? "Hard-copy requirements must be received before pickup"
+                                : "Request must be approved before pickup");
             }
 
             documentRequest.setStatus("Ready for Pickup");
@@ -506,6 +518,53 @@ public class DocumentRequestController {
             return ResponseEntity.ok("Request marked ready for pickup");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error marking request ready for pickup");
+        }
+    }
+
+    @PutMapping("/{id}/hard-copy-submitted")
+    public ResponseEntity<String> markHardCopySubmitted(@PathVariable Long id, HttpServletRequest request) {
+        try {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+
+            Optional<DocumentRequest> optionalRequest = documentRequestRepository.findById(id);
+            if (optionalRequest.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Document request not found");
+            }
+
+            DocumentRequest documentRequest = optionalRequest.get();
+            if (!documentRequest.isHardCopySubmissionRequired()) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("This request does not require hard-copy submission");
+            }
+            if (!"Awaiting Hard Copy Submission".equals(documentRequest.getStatus())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("Request must be awaiting hard-copy submission");
+            }
+
+            documentRequest.setStatus("Hard Copy Submitted");
+            documentRequest.setHardCopySubmittedAt(java.time.LocalDateTime.now());
+            documentRequest.setUpdatedAt(java.time.LocalDateTime.now());
+            DocumentRequest savedRequest = documentRequestRepository.save(documentRequest);
+
+            StatusLog statusLog = new StatusLog();
+            statusLog.setDocumentRequest(savedRequest);
+            statusLog.setStatus("Hard Copy Submitted");
+            statusLog.setTimestamp(java.time.LocalDateTime.now());
+            statusLogRepository.save(statusLog);
+
+            notificationService.createNotification(
+                    savedRequest.getResident(),
+                    "Hard Copy Requirements Received",
+                    "The barangay office received the hard-copy requirements for '" + savedRequest.getDocumentName() + "'.",
+                    "REQUEST_HARD_COPY_SUBMITTED",
+                    null,
+                    "DOCUMENT_REQUEST",
+                    savedRequest.getRequestId());
+
+            return ResponseEntity.ok("Hard-copy requirements marked as received");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error marking hard-copy requirements received");
         }
     }
 
@@ -592,9 +651,14 @@ public class DocumentRequestController {
         dto.setDetails(request.getDetails());
         dto.setStatus(request.getStatus());
         dto.setSubmittedAt(request.getSubmittedAt().toString());
+        dto.setHardCopySubmissionRequired(request.isHardCopySubmissionRequired());
+        dto.setHardCopyRequirements(parseStoredList(request.getHardCopyRequirements()));
 
         if (request.getUpdatedAt() != null) {
             dto.setUpdatedAt(request.getUpdatedAt().toString());
+        }
+        if (request.getHardCopySubmittedAt() != null) {
+            dto.setHardCopySubmittedAt(request.getHardCopySubmittedAt().toString());
         }
 
         // Set attachments
@@ -624,6 +688,28 @@ public class DocumentRequestController {
         // For now, return the entity directly since the frontend expects this structure
         // In a proper implementation, you would create a separate RequestAttachmentDTO
         return attachment;
+    }
+
+    private String normalizedStoredRequirements(String json) {
+        try {
+            return objectMapper.writeValueAsString(parseStoredList(json));
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
+    private List<String> parseStoredList(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {}).stream()
+                    .filter(value -> value != null && !value.isBlank())
+                    .map(String::trim)
+                    .toList();
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     private DocumentRequestDTO parseJson(String dataJson) {

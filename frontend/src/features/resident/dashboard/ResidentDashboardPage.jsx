@@ -66,10 +66,17 @@ export default function DashboardPage() {
   }, [requests]);
 
   const requestUpdates = useMemo(() => {
+    const popupStatuses = new Set([
+      'approved',
+      'awaiting-hard-copy-submission',
+      'hard-copy-submitted',
+      'ready-for-pickup',
+    ]);
+
     return requests
       .filter((request) => {
         const status = normalizeRequestStatus(request.status);
-        return status === 'approved' || status === 'ready-for-pickup';
+        return popupStatuses.has(status);
       })
       .sort((firstRequest, secondRequest) => (
         new Date(secondRequest.updatedAt || secondRequest.submittedAt || 0) -
@@ -332,7 +339,7 @@ export default function DashboardPage() {
                               <FileText className="w-4 h-4" />
                             </div>
                             <div>
-                              <h4 className="font-bold text-gray-900 text-sm md:text-base">{request.documentName}</h4>
+                              <h4 className="font-[family-name:var(--font-montserrat)] font-bold text-gray-900 text-sm md:text-base">{request.documentName}</h4>
                               <p className="text-xs md:text-sm text-gray-600 flex items-center">
                                 <Calendar className="w-3.5 h-3.5 mr-1" />
                                 Submitted {new Date(request.submittedAt).toLocaleDateString()}

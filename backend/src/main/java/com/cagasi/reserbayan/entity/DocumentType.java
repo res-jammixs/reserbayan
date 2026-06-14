@@ -26,6 +26,9 @@ public class DocumentType {
     private String pdfPath;
     @Lob
     private String requirements; // JSON string
+    private boolean hardCopySubmissionRequired;
+    @Lob
+    private String hardCopyRequirements; // JSON string
     @Lob
     private String uses; // JSON string
     private boolean isActive;
@@ -145,6 +148,22 @@ public class DocumentType {
 
     public void setRequirements(String requirements) {
         this.requirements = requirements;
+    }
+
+    public boolean isHardCopySubmissionRequired() {
+        return hardCopySubmissionRequired;
+    }
+
+    public void setHardCopySubmissionRequired(boolean hardCopySubmissionRequired) {
+        this.hardCopySubmissionRequired = hardCopySubmissionRequired;
+    }
+
+    public String getHardCopyRequirements() {
+        return hardCopyRequirements;
+    }
+
+    public void setHardCopyRequirements(String hardCopyRequirements) {
+        this.hardCopyRequirements = hardCopyRequirements;
     }
 
     public String getUses() {

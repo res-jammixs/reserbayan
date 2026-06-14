@@ -409,6 +409,8 @@ export default function RequestFormModal({ user, onClose, onSuccess }) {
     [documentsData, selectedDocument],
   );
   const requirements = selectedDocumentData?.details?.requirements || [];
+  const hardCopySubmissionRequired = Boolean(selectedDocumentData?.details?.hardCopySubmissionRequired);
+  const hardCopyRequirements = selectedDocumentData?.details?.hardCopyRequirements || [];
   const selectedFileCount = getFileCount(requirementFiles, supportingFiles);
   const requirementFileCount = getRequirementFileCount(requirementFiles);
   const fileSignature = getFileSignature(selectedDocument, requirements, requirementFiles, supportingFiles);
@@ -689,7 +691,7 @@ export default function RequestFormModal({ user, onClose, onSuccess }) {
                     <p className="text-xs font-extrabold uppercase tracking-wide text-[#d8def2]">
                       Resident document request
                     </p>
-                    <h2 id="request-document-title" className="mt-2 text-2xl font-extrabold leading-tight">
+                    <h2 id="request-document-title" className="mt-2 font-[family-name:var(--font-montserrat)] text-2xl font-extrabold leading-tight">
                       Request a document
                     </h2>
                     <p className="mb-2 mt-1 max-w-2xl text-sm font-medium text-[#eef3ff]">
@@ -788,6 +790,31 @@ export default function RequestFormModal({ user, onClose, onSuccess }) {
                           </p>
                         )}
                       </section>
+
+                      {hardCopySubmissionRequired && (
+                        <section className="rounded-3xl border border-[#c2cbea] bg-[#eef3ff]/60 p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-[#243b8e]" />
+                              <h3 className="text-sm font-extrabold text-slate-800">Hard Copy Submission</h3>
+                            </div>
+                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-[#122361] ring-1 ring-[#d8def2]">
+                              Required
+                            </span>
+                          </div>
+                          <p className="mb-3 text-xs font-semibold leading-5 text-slate-600">
+                            Submit these physically at the barangay office after staff verifies this request.
+                          </p>
+                          <div className="grid max-h-40 gap-2 overflow-y-auto pr-1">
+                            {hardCopyRequirements.map((requirement, index) => (
+                              <div key={`hard-copy-${requirement}-${index}`} className="flex gap-2 rounded-2xl bg-white p-2 text-xs font-semibold text-slate-700">
+                                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                                <span>{requirement}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      )}
 
                       <section className="rounded-3xl border border-[#d8def2] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)] lg:col-span-2">
                         <label htmlFor="dashboard-request-purpose" className="flex items-center gap-2 text-sm font-extrabold text-slate-800">

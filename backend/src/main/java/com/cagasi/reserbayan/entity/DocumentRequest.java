@@ -45,6 +45,13 @@ public class DocumentRequest {
     @Column(nullable = false)
     private String status = "Pending";
 
+    private boolean hardCopySubmissionRequired;
+
+    @Column(columnDefinition = "TEXT")
+    private String hardCopyRequirements;
+
+    private LocalDateTime hardCopySubmittedAt;
+
     // Rejection reason field
     @Column(columnDefinition = "TEXT")
     private String rejectionReason;
@@ -119,6 +126,30 @@ public class DocumentRequest {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public boolean isHardCopySubmissionRequired() {
+        return hardCopySubmissionRequired;
+    }
+
+    public void setHardCopySubmissionRequired(boolean hardCopySubmissionRequired) {
+        this.hardCopySubmissionRequired = hardCopySubmissionRequired;
+    }
+
+    public String getHardCopyRequirements() {
+        return hardCopyRequirements;
+    }
+
+    public void setHardCopyRequirements(String hardCopyRequirements) {
+        this.hardCopyRequirements = hardCopyRequirements;
+    }
+
+    public LocalDateTime getHardCopySubmittedAt() {
+        return hardCopySubmittedAt;
+    }
+
+    public void setHardCopySubmittedAt(LocalDateTime hardCopySubmittedAt) {
+        this.hardCopySubmittedAt = hardCopySubmittedAt;
     }
 
     public String getRejectionReason() {

@@ -597,6 +597,8 @@ export function RequestDrawerProvider({ children }) {
   }), [discardRequest, draft, hasDraft, isMinimized, isOpen, minimizeRequest, restoreRequest, startRequest]);
 
   const requirements = draft?.document?.details?.requirements || [];
+  const hardCopySubmissionRequired = Boolean(draft?.document?.details?.hardCopySubmissionRequired);
+  const hardCopyRequirements = draft?.document?.details?.hardCopyRequirements || [];
   const draftFileCount = getDraftFileCount(draft);
 
   return (
@@ -704,6 +706,33 @@ export function RequestDrawerProvider({ children }) {
                     />
                   </section>
                 </div>
+
+                {hardCopySubmissionRequired && (
+                  <section className="rounded-3xl border border-[#c2cbea] bg-[#eef3ff]/60 p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
+                          <FileText className="h-4 w-4 text-[#243b8e]" />
+                          Hard Copy Submission
+                        </p>
+                        <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                          Submit these physically at the barangay office after staff verifies this request.
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-[#122361] ring-1 ring-[#d8def2]">
+                        Required
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {hardCopyRequirements.map((requirement, index) => (
+                        <div key={`drawer-hard-copy-${requirement}-${index}`} className="flex gap-2 rounded-2xl bg-white p-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                          <span>{requirement}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
                 <section className="rounded-3xl border border-[#d8def2] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
                   <div className="flex items-start justify-between gap-3">

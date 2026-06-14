@@ -27,8 +27,15 @@ export function formatShortDateTime(dateValue, fallback = 'Recently') {
 
 export function formatStatusLabel(status) {
   if (!status) return '';
-  if (status.toLowerCase().replace(/[\s_-]+/g, '-') === 'ready-for-pickup') {
+  const normalizedStatus = status.toLowerCase().replace(/[\s_-]+/g, '-');
+  if (normalizedStatus === 'ready-for-pickup') {
     return 'Ready for Pickup';
+  }
+  if (normalizedStatus === 'awaiting-hard-copy-submission') {
+    return 'Awaiting Hard Copy Submission';
+  }
+  if (normalizedStatus === 'hard-copy-submitted') {
+    return 'Hard Copy Submitted';
   }
   return status.toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
 }

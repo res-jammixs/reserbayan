@@ -25,7 +25,7 @@ import FilterDropdown from '@/shared/components/forms/FilterDropdown';
 
 const normalizeRequestStatus = (status) => status?.toLowerCase().replace(/[\s_-]+/g, '-') || '';
 
-const statusKeys = ['pending', 'approved', 'ready-for-pickup', 'completed', 'rejected', 'cancelled'];
+const statusKeys = ['pending', 'approved', 'awaiting-hard-copy-submission', 'hard-copy-submitted', 'ready-for-pickup', 'completed', 'rejected', 'cancelled'];
 
 const sortOptions = [
   { value: 'submittedAt', label: 'Date' },
@@ -130,6 +130,8 @@ export default function RequestsPage() {
       { value: 'all', label: `All Requests (${requests.length})` },
       { value: 'pending', label: `Pending (${counts.pending || 0})` },
       { value: 'approved', label: `Approved (${counts.approved || 0})` },
+      { value: 'awaiting-hard-copy-submission', label: `Awaiting Hard Copy (${counts['awaiting-hard-copy-submission'] || 0})` },
+      { value: 'hard-copy-submitted', label: `Hard Copy Submitted (${counts['hard-copy-submitted'] || 0})` },
       { value: 'ready-for-pickup', label: `Ready for Pickup (${counts['ready-for-pickup'] || 0})` },
       { value: 'completed', label: `Completed (${counts.completed || 0})` },
       { value: 'rejected', label: `Rejected (${counts.rejected || 0})` },
