@@ -20,6 +20,18 @@ export function getRequestStatusAccent(status) {
       glow: 'from-emerald-50 to-green-50',
       icon: 'from-emerald-600 to-green-500',
     },
+    'awaiting-hard-copy-submission': {
+      compact: 'from-amber-500 to-[#2f84c0]',
+      bar: 'from-amber-400 via-[#2f84c0] to-[#243b8e]',
+      glow: 'from-amber-50 to-[#eef3ff]',
+      icon: 'from-amber-500 to-[#2f84c0]',
+    },
+    'hard-copy-submitted': {
+      compact: 'from-[#2f84c0] to-emerald-500',
+      bar: 'from-[#243b8e] via-[#2f84c0] to-emerald-400',
+      glow: 'from-[#eef3ff] to-emerald-50',
+      icon: 'from-[#2f84c0] to-emerald-500',
+    },
     'ready-for-pickup': {
       compact: 'from-[#2f84c0] to-emerald-500',
       bar: 'from-[#243b8e] via-[#2f84c0] to-emerald-400',

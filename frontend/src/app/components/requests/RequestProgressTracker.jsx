@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   FileCheck2,
+  FileText,
   PackageCheck,
   RotateCcw,
   ShieldCheck,
@@ -25,10 +26,25 @@ const formatTrackerDate = (value) => {
   });
 };
 
+const normalizeStatus = (status) => String(status || 'pending').trim().toLowerCase().replace(/[\s_-]+/g, '-');
+
+const parseRequirementList = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (!value || typeof value !== 'string') return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+};
+
 const getRequestSteps = (request) => {
-  const status = request?.status?.toLowerCase() || 'pending';
+  const status = normalizeStatus(request?.status);
+  const needsHardCopy = Boolean(request?.hardCopySubmissionRequired);
   const submittedDate = formatTrackerDate(request?.submittedAt);
   const updatedDate = formatTrackerDate(request?.updatedAt);
+  const hardCopySubmittedDate = formatTrackerDate(request?.hardCopySubmittedAt || request?.updatedAt);
 
   if (status === 'rejected') {
     return {
@@ -104,9 +120,10 @@ const getRequestSteps = (request) => {
   const activeIndexByStatus = {
     pending: 1,
     approved: 2,
-    'ready for pickup': 3,
-    'ready-for-pickup': 3,
-    completed: 4,
+    'awaiting-hard-copy-submission': 3,
+    'hard-copy-submitted': needsHardCopy ? 3 : 2,
+    'ready-for-pickup': needsHardCopy ? 4 : 3,
+    completed: needsHardCopy ? 5 : 4,
   };
   const activeIndex = activeIndexByStatus[status] ?? 1;
 
@@ -125,13 +142,19 @@ const getRequestSteps = (request) => {
     {
       title: 'Admin verified',
       detail: 'Approved for preparation.',
-      date: status === 'approved' ? updatedDate : null,
+      date: ['approved', 'awaiting-hard-copy-submission'].includes(status) ? updatedDate : null,
       icon: ShieldCheck,
     },
+    ...(needsHardCopy ? [{
+      title: 'Hard copy submission',
+      detail: status === 'hard-copy-submitted' ? 'Physical copies received.' : 'Submit physical copies.',
+      date: status === 'hard-copy-submitted' ? hardCopySubmittedDate : null,
+      icon: FileText,
+    }] : []),
     {
       title: 'Ready for pick up',
       detail: 'Claim at the office.',
-      date: status === 'ready for pickup' || status === 'ready-for-pickup' ? updatedDate : null,
+      date: status === 'ready-for-pickup' ? updatedDate : null,
       icon: PackageCheck,
     },
     {
@@ -148,7 +171,8 @@ const getRequestSteps = (request) => {
   const headlineByStatus = {
     pending: 'Verification in progress',
     approved: 'Verified by admin',
-    'ready for pickup': 'Ready for pick up',
+    'awaiting-hard-copy-submission': 'Hard copy needed',
+    'hard-copy-submitted': 'Hard copy received',
     'ready-for-pickup': 'Ready for pick up',
     completed: 'Completed',
   };
@@ -156,7 +180,8 @@ const getRequestSteps = (request) => {
   const summaryByStatus = {
     pending: 'Checking requirements.',
     approved: 'Preparing the document.',
-    'ready for pickup': 'Bring a valid ID when claiming.',
+    'awaiting-hard-copy-submission': 'Submit the listed physical documents.',
+    'hard-copy-submitted': 'Preparing the document.',
     'ready-for-pickup': 'Bring a valid ID when claiming.',
     completed: 'Request finalized.',
   };
@@ -167,6 +192,7 @@ const getRequestSteps = (request) => {
     headline: headlineByStatus[status] || 'Request in progress',
     summary: summaryByStatus[status] || 'Track the current progress of this document request.',
     steps,
+    hardCopyRequirements: needsHardCopy ? parseRequirementList(request?.hardCopyRequirements) : [],
   };
 };
 
@@ -238,11 +264,21 @@ function RequestProgressTracker({ request }) {
 
       <div className="px-3 py-3">
         <div className="relative">
-          <div className="absolute left-4 right-4 top-4 z-0 hidden h-[3px] rounded-full bg-[#d8def2] sm:block" />
+          <div
+            className="absolute top-4 z-0 hidden h-[3px] rounded-full bg-[#d8def2] sm:block"
+            style={{
+              left: `calc(50% / ${tracker.steps.length})`,
+              right: `calc(50% / ${tracker.steps.length})`,
+            }}
+          />
           <motion.div
-            className={`absolute left-4 right-4 top-4 z-0 hidden h-[3px] origin-left rounded-full sm:block ${
+            className={`absolute top-4 z-0 hidden h-[3px] origin-left rounded-full sm:block ${
               isIssue ? 'bg-amber-400' : 'bg-gradient-to-r from-[#243b8e] to-[#2f84c0]'
             }`}
+            style={{
+              left: `calc(50% / ${tracker.steps.length})`,
+              right: `calc(50% / ${tracker.steps.length})`,
+            }}
             initial={false}
             animate={{ scaleX: progress / 100 }}
             transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
@@ -255,13 +291,6 @@ function RequestProgressTracker({ request }) {
             {tracker.steps.map((step, index) => {
               const Icon = step.icon;
               const classes = getStepClasses(step.state, tracker.tone);
-              const isFirstStep = index === 0;
-              const isLastStep = index === tracker.steps.length - 1;
-              const stepAlignment = isFirstStep
-                ? 'sm:items-start sm:text-left'
-                : isLastStep
-                  ? 'sm:items-end sm:text-right'
-                  : 'sm:items-center sm:text-center';
 
               return (
                 <motion.div
@@ -270,7 +299,7 @@ function RequestProgressTracker({ request }) {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.04, duration: 0.24, ease: 'easeOut' }}
-                  className={`relative z-[1] flex flex-col rounded-lg border p-2 sm:border-0 sm:bg-transparent sm:p-0 ${stepAlignment} ${
+                  className={`relative z-[1] flex flex-col rounded-lg border p-2 sm:items-center sm:border-0 sm:bg-transparent sm:p-0 sm:text-center ${
                     step.state === 'current' ? 'border-[#c2cbea] bg-[#fbfdff]' : 'border-slate-100 bg-white'
                   }`}
                 >

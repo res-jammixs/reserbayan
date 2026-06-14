@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Ban, FileText, Calendar, XCircle, Paperclip, Edit2, Save, Trash2, Plus, RotateCcw, Mail, MapPin, Phone, User, CheckCircle, PackageCheck } from 'lucide-react';
+import { Ban, FileText, Calendar, XCircle, Paperclip, Edit2, Save, Trash2, Plus, RotateCcw, Mail, MapPin, Phone, User, CheckCircle, PackageCheck, ClipboardCheck, ClipboardList } from 'lucide-react';
 import NotificationModal from '@/app/components/NotificationModal';
 import ConfirmationModal from '@/shared/components/modals/ConfirmationModal';
 import RejectionReasonModal from '@/shared/components/modals/RejectionReasonModal';
@@ -7,7 +7,7 @@ import AiReviewPanel from '@/shared/components/ai/AiReviewPanel';
 import RequestProgressTracker from './RequestProgressTracker';
 import { motion } from 'framer-motion';
 
-function RequestModal({ request, user, onClose, cancelRequest, completeRequest, readyForPickupRequest, approveRequest, rejectRequest, onReRequest, onUpdateRequest }) {
+function RequestModal({ request, user, onClose, cancelRequest, completeRequest, readyForPickupRequest, hardCopySubmittedRequest, approveRequest, rejectRequest, onReRequest, onUpdateRequest }) {
   const [notification, setNotification] = useState(null);
   
   // --- LOCAL DISPLAY STATE ---
@@ -28,6 +28,7 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
   const [isSaving, setIsSaving] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [isMarkingReady, setIsMarkingReady] = useState(false);
+  const [isMarkingHardCopy, setIsMarkingHardCopy] = useState(false);
   const [isDownloading, setIsDownloading] = useState({});
   const [confirmation, setConfirmation] = useState(null);
   const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
@@ -52,6 +53,17 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
     || displayRequest.estimatedProcessingTime
     || displayRequest.document?.processingTime
     || displayRequest.documentType?.processingTime;
+  const parseRequirements = (value) => {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (!value || typeof value !== 'string') return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  };
+  const hardCopyRequirements = parseRequirements(displayRequest.hardCopyRequirements);
   const infoItems = [
     { label: 'Name', value: residentFullName, icon: User },
     { label: 'Contact Number', value: residentPhoneNumber, icon: Phone },
@@ -66,6 +78,10 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
         return <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center"><span className="text-white text-xs">✓</span></div>;
       case 'ready-for-pickup':
         return <div className="w-5 h-5 bg-[#2f84c0] rounded-full flex items-center justify-center"><PackageCheck className="h-3 w-3 text-white" /></div>;
+      case 'awaiting-hard-copy-submission':
+        return <div className="w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center"><FileText className="h-3 w-3 text-white" /></div>;
+      case 'hard-copy-submitted':
+        return <div className="w-5 h-5 bg-[#2f84c0] rounded-full flex items-center justify-center"><ClipboardCheck className="h-3 w-3 text-white" /></div>;
       case 'completed':
         return <div className="w-5 h-5 bg-[#2f84c0] rounded-full flex items-center justify-center"><span className="text-white text-xs">✓</span></div>;
       case 'pending':
@@ -240,6 +256,47 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
     } finally {
       setIsRejecting(false);
     }
+  };
+
+  const handleHardCopySubmittedRequest = async () => {
+    setConfirmation({
+      type: 'complete',
+      title: 'Mark Hard Copy Received',
+      message: 'Confirm that the resident has submitted the required hard-copy documents at the barangay office.',
+      confirmText: 'Mark Received',
+      confirmButtonClass: 'bg-[#243b8e] hover:bg-[#122361]',
+      onConfirm: async () => {
+        setIsMarkingHardCopy(true);
+        try {
+          if (!hardCopySubmittedRequest) {
+            throw new Error('Marking hard-copy requirements received is not available in this view.');
+          }
+
+          const updatedRequest = await hardCopySubmittedRequest(displayRequest.requestId);
+
+          setDisplayRequest((current) => ({
+            ...current,
+            ...(updatedRequest || {}),
+            status: 'Hard Copy Submitted',
+            hardCopySubmittedAt: updatedRequest?.hardCopySubmittedAt || new Date().toISOString(),
+            updatedAt: updatedRequest?.updatedAt || new Date().toISOString(),
+          }));
+
+          setNotification({
+            type: 'success',
+            title: 'Hard Copy Received',
+            message: 'Hard-copy requirements have been marked as received.',
+            autoClose: true
+          });
+
+          if (onUpdateRequest) onUpdateRequest();
+        } catch (err) {
+          setNotification({ type: 'error', title: 'Update Failed', message: err.message });
+        } finally {
+          setIsMarkingHardCopy(false);
+        }
+      },
+    });
   };
 
   const handleReadyForPickupRequest = async () => {
@@ -457,7 +514,7 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
 
       <div className="relative mx-auto flex h-full max-w-7xl items-center justify-center p-2">
         <motion.div
-          className="w-full overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-sm max-h-[97vh] sm:max-h-[94vh]"
+          className="flex w-full max-h-[97vh] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm sm:max-h-[94vh]"
           initial={{ opacity: 0, y: 18, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -506,7 +563,7 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
           </div>
         </div>
 
-        <div className="space-y-3 p-3 sm:p-4">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
           {!isEditing && (
             <div className="space-y-2">
               <RequestProgressTracker request={displayRequest} />
@@ -549,17 +606,45 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
             </div>
           )}
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-            <div className="space-y-2">
+          <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(220px,0.85fr)_minmax(0,1.35fr)_minmax(240px,1fr)]">
+            <aside className="flex flex-col space-y-2 opacity-90">
+              <h3 className="mb-2 flex items-center gap-2 text-xs font-bold text-gray-700">
+                <User className="h-3.5 w-3.5 text-[#243b8e] opacity-70" aria-hidden="true" />
+                Resident Basic Information
+              </h3>
+              <div className="flex-1 space-y-2 rounded-xl border border-gray-100/80 bg-gray-50/60 p-2">
+                {infoItems.map(({ label, value, icon: Icon }) => (
+                  <div key={label} className="flex min-w-0 items-start gap-2 rounded-lg bg-white/80 p-2 ring-1 ring-gray-100/80">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#eef3ff]/70">
+                      <Icon className="h-3.5 w-3.5 text-[#243b8e] opacity-75" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">{label}</p>
+                      <p className="break-words text-xs font-semibold leading-snug text-gray-800" title={value}>{value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </aside>
+
+            <div className="flex flex-col space-y-2">
               <div>
                 <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-900">
                   <FileText className="h-4 w-4 text-[#243b8e]" aria-hidden="true" />
                   Document Information
                 </h3>
                 <div className={`grid gap-2 ${processingTime ? 'md:grid-cols-[minmax(0,1fr)_180px]' : ''}`}>
-                  <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Document Name</p>
-                    <p className="mt-1 text-sm font-bold text-gray-900">{displayRequest.documentName}</p>
+                  <div className="relative overflow-hidden rounded-lg border border-[#c2cbea] bg-gradient-to-br from-[#eef3ff] via-white to-white p-3 shadow-sm">
+                    <div className="absolute inset-y-0 left-0 w-1 bg-[#243b8e]" aria-hidden="true" />
+                    <div className="flex items-start gap-2 pl-1">
+                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white text-[#243b8e] ring-1 ring-[#d8def2]">
+                        <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#243b8e]">Document Name</p>
+                        <p className="mt-0.5 font-[family-name:var(--font-montserrat)] text-sm font-extrabold leading-none text-[#00114e]">{displayRequest.documentName}</p>
+                      </div>
+                    </div>
                   </div>
                   {processingTime && (
                     <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
@@ -570,9 +655,12 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                 </div>
               </div>
 
-              <div>
+              <div className="flex flex-1 flex-col">
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-gray-900">Purpose & Details</h3>
+                  <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                    <ClipboardList className="h-4 w-4 text-[#243b8e]" aria-hidden="true" />
+                    Purpose & Details
+                  </h3>
                   {!isEditing && user !== null && displayRequest.status === 'Pending' && (
                     <button
                       onClick={() => setIsEditing(true)}
@@ -585,128 +673,127 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
 
                 {isEditing ? (
                   <textarea
-                    className="w-full rounded-lg border-2 border-[#d8def2] bg-white p-3 focus:border-[#2f84c0] focus:ring-2 focus:ring-[#2f84c0]"
+                    className="min-h-32 flex-1 w-full rounded-lg border-2 border-[#d8def2] bg-white p-3 focus:border-[#2f84c0] focus:ring-2 focus:ring-[#2f84c0]"
                     rows="3"
                     value={editDetails}
                     onChange={(e) => setEditDetails(e.target.value)}
                   />
                 ) : (
-                  <div className="rounded-lg border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 p-3">
-                    <p className="line-clamp-3 text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">{displayRequest.details}</p>
+                  <div className="flex-1 rounded-lg border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 p-3">
+                    <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">{displayRequest.details}</p>
                   </div>
                 )}
               </div>
-
-              <div>
-                <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-900">
-                  <Paperclip className="h-4 w-4 text-[#243b8e]" aria-hidden="true" />
-                  Attached Requirements
-                </h3>
-
-                {displayRequest.attachments && displayRequest.attachments.length > 0 ? (
-                  <div className="mb-1 grid gap-2 sm:grid-cols-2">
-                    {displayRequest.attachments
-                      .filter(f => !filesToRemove.includes(f.id))
-                      .map((file) => (
-                        <div
-                          key={file.id}
-                          className="group flex items-center justify-between rounded-lg border border-gray-200 bg-white p-2"
-                        >
-                          <button
-                            onClick={() => handleDownloadAttachment(file)}
-                            disabled={isDownloading[file.id]}
-                            className="flex flex-1 items-center gap-3 overflow-hidden rounded-lg p-1 -m-1 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                            title="Click to download"
-                          >
-                            <div className="rounded-md bg-[#eef3ff] p-2">
-                              <FileText className="h-4 w-4 text-[#243b8e]" />
-                            </div>
-                            <div className="overflow-hidden">
-                              <p className="truncate text-sm font-medium text-gray-700">
-                                {file.fileName}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {isDownloading[file.id] ? 'Downloading...' : 'Click to download'}
-                              </p>
-                            </div>
-                          </button>
-
-                          {isEditing && (
-                            <button
-                              onClick={() => removeExistingFile(file.id)}
-                              className="rounded-full p-2 text-red-400 hover:bg-red-50 hover:text-red-600"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                  </div>
-                ) : (
-                  <div className="mb-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 text-sm font-medium text-gray-500">
-                    No attached requirements.
-                  </div>
-                )}
-
-                {isEditing && (
-                  <div className="mt-3">
-                    <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-3">
-                      <input
-                        type="file"
-                        id="edit-upload"
-                        multiple
-                        onChange={handleFileSelect}
-                        className="hidden"
-                      />
-                      <label htmlFor="edit-upload" className="flex cursor-pointer flex-col items-center gap-2 text-gray-500 hover:text-[#243b8e]">
-                        <Plus className="w-6 h-6" />
-                        <span className="text-sm">Click to add more files</span>
-                      </label>
-                    </div>
-                    {newFiles.length > 0 && (
-                      <div className="mt-2 space-y-2">
-                        {newFiles.map((file, index) => (
-                          <div key={index} className="flex items-center justify-between rounded-lg border border-green-100 bg-green-50 p-2">
-                            <span className="truncate px-2 text-sm text-green-800">{file.name} (New)</span>
-                            <button onClick={() => removeNewFile(index)} className="p-1 text-green-600">
-                              <XCircle className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {!isEditing && user === null && (
-                <AiReviewPanel requestId={displayRequest.requestId} />
-              )}
             </div>
 
-            <aside className="space-y-2">
-              <h3 className="mb-2 flex items-center gap-2 font-bold text-gray-900">
-                <User className="h-4 w-4 text-[#243b8e]" aria-hidden="true" />
-                Resident Basic Information
-              </h3>
-              <div className="space-y-2 rounded-xl border border-gray-100 bg-gray-50 p-2">
-                {infoItems.map(({ label, value, icon: Icon }) => (
-                  <div key={label} className="flex min-w-0 items-start gap-2 rounded-lg bg-white p-2 ring-1 ring-gray-100">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#eef3ff]">
-                      <Icon className="h-4 w-4 text-[#243b8e]" aria-hidden="true" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</p>
-                      <p className="truncate text-sm font-bold text-gray-900" title={value}>{value}</p>
-                    </div>
+            <div className="flex flex-col space-y-3">
+              {hardCopyRequirements.length > 0 && (
+                <div>
+                  <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-900">
+                    <ClipboardCheck className="h-4 w-4 text-[#243b8e]" aria-hidden="true" />
+                    Hard Copy Requirements
+                  </h3>
+                  <div className="grid gap-2">
+                    {hardCopyRequirements.map((requirement, index) => (
+                      <div key={`hard-copy-${requirement}-${index}`} className="flex gap-2 rounded-lg border border-[#c2cbea] bg-[#eef3ff]/70 px-3 py-2 text-xs font-semibold text-gray-700">
+                        <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600" aria-hidden="true" />
+                        <span className="break-words">{requirement}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+              )}
+
+              <div className="flex flex-1 flex-col">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-900">
+                <Paperclip className="h-4 w-4 text-[#243b8e]" aria-hidden="true" />
+                Attached Requirements
+              </h3>
+
+              {displayRequest.attachments && displayRequest.attachments.length > 0 ? (
+                <div className="mb-1 grid gap-2">
+                  {displayRequest.attachments
+                    .filter(f => !filesToRemove.includes(f.id))
+                    .map((file) => (
+                      <div
+                        key={file.id}
+                        className="group flex items-center justify-between rounded-lg border border-gray-200 bg-white p-2"
+                      >
+                        <button
+                          onClick={() => handleDownloadAttachment(file)}
+                          disabled={isDownloading[file.id]}
+                          className="flex flex-1 items-center gap-3 overflow-hidden rounded-lg p-1 -m-1 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          title="Click to download"
+                        >
+                          <div className="rounded-md bg-[#eef3ff] p-2">
+                            <FileText className="h-4 w-4 text-[#243b8e]" />
+                          </div>
+                          <div className="overflow-hidden">
+                            <p className="truncate text-sm font-medium text-gray-700">
+                              {file.fileName}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {isDownloading[file.id] ? 'Downloading...' : 'Click to download'}
+                            </p>
+                          </div>
+                        </button>
+
+                        {isEditing && (
+                          <button
+                            onClick={() => removeExistingFile(file.id)}
+                            className="rounded-full p-2 text-red-400 hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="mb-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-3 text-sm font-medium text-gray-500">
+                  No attached requirements.
+                </div>
+              )}
+
+              {isEditing && (
+                <div className="mt-3">
+                  <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-3">
+                    <input
+                      type="file"
+                      id="edit-upload"
+                      multiple
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <label htmlFor="edit-upload" className="flex cursor-pointer flex-col items-center gap-2 text-gray-500 hover:text-[#243b8e]">
+                      <Plus className="w-6 h-6" />
+                      <span className="text-sm">Click to add more files</span>
+                    </label>
+                  </div>
+                  {newFiles.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      {newFiles.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between rounded-lg border border-green-100 bg-green-50 p-2">
+                          <span className="truncate px-2 text-sm text-green-800">{file.name} (New)</span>
+                          <button onClick={() => removeNewFile(index)} className="p-1 text-green-600">
+                            <XCircle className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               </div>
-            </aside>
+            </div>
           </div>
+
+          {!isEditing && user === null && (
+            <AiReviewPanel requestId={displayRequest.requestId} />
+          )}
         </div>
 
-        <div className="flex justify-end gap-3 rounded-b-2xl border-t border-gray-200 bg-gray-50 p-3 sm:p-4">
+        <div className="sticky bottom-0 z-20 flex shrink-0 justify-end gap-3 rounded-b-2xl border-t border-gray-200 bg-gray-50/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:p-4">
           
           {isEditing ? (
              <>
@@ -760,7 +847,18 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                     </>
                  )}
 
-                 {user === null && normalizedStatus === 'approved' && (
+                 {user === null && normalizedStatus === 'awaiting-hard-copy-submission' && (
+                    <button
+                        onClick={handleHardCopySubmittedRequest}
+                        disabled={isMarkingHardCopy}
+                        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#243b8e] to-[#2f84c0] px-5 py-2 font-medium text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0] disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                        <ClipboardCheck className="w-4 h-4" />
+                        {isMarkingHardCopy ? 'Updating...' : 'Mark Hard Copy Received'}
+                    </button>
+                 )}
+
+                 {user === null && (normalizedStatus === 'approved' || normalizedStatus === 'hard-copy-submitted') && (
                     <button
                         onClick={handleReadyForPickupRequest}
                         disabled={isMarkingReady}

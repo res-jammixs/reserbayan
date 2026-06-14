@@ -20,6 +20,9 @@ public class DocumentRequestDTO {
     private String status;
     private String submittedAt;
     private String updatedAt;
+    private boolean hardCopySubmissionRequired;
+    private List<String> hardCopyRequirements;
+    private String hardCopySubmittedAt;
     private List<RequestAttachment> attachments;
     private int attachmentCount;
 
@@ -143,6 +146,30 @@ public class DocumentRequestDTO {
 
     public void setUpdatedAt(String updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public boolean isHardCopySubmissionRequired() {
+        return hardCopySubmissionRequired;
+    }
+
+    public void setHardCopySubmissionRequired(boolean hardCopySubmissionRequired) {
+        this.hardCopySubmissionRequired = hardCopySubmissionRequired;
+    }
+
+    public List<String> getHardCopyRequirements() {
+        return hardCopyRequirements;
+    }
+
+    public void setHardCopyRequirements(List<String> hardCopyRequirements) {
+        this.hardCopyRequirements = hardCopyRequirements;
+    }
+
+    public String getHardCopySubmittedAt() {
+        return hardCopySubmittedAt;
+    }
+
+    public void setHardCopySubmittedAt(String hardCopySubmittedAt) {
+        this.hardCopySubmittedAt = hardCopySubmittedAt;
     }
 
     public List<RequestAttachment> getAttachments() {

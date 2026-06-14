@@ -209,7 +209,7 @@ function AdminDocumentCard({ doc, viewMode, onDelete, basePath, deleteMode }) {
               {requirementsCount} requirements
             </span>
           </div>
-          <h3 className="text-xl font-extrabold uppercase leading-tight text-[#122361]">
+          <h3 className="font-[family-name:var(--font-montserrat)] text-xl font-extrabold uppercase leading-tight text-[#122361]">
             {doc.name}
           </h3>
           <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600">
@@ -251,7 +251,7 @@ function AdminDocumentCard({ doc, viewMode, onDelete, basePath, deleteMode }) {
         </div>
 
         <div className="relative z-10 min-w-0 flex-1">
-          <h3 className="text-base font-extrabold uppercase leading-tight tracking-tight text-[#122361] sm:text-[1.05rem]">
+          <h3 className="font-[family-name:var(--font-montserrat)] text-base font-extrabold uppercase leading-tight tracking-tight text-[#122361] sm:text-[1.05rem]">
             {doc.name}
           </h3>
           <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">

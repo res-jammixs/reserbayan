@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, User, FileText, Calendar, Clock, Info, Paperclip, Download, CheckCircle, XCircle, PackageCheck } from 'lucide-react';
+import { X, User, FileText, Calendar, Clock, Paperclip, Download, CheckCircle, XCircle, PackageCheck, ClipboardCheck, ClipboardList, Mail, Phone, MapPin } from 'lucide-react';
 import AiReviewPanel from '@/shared/components/ai/AiReviewPanel';
 import NotificationModal from '@/app/components/NotificationModal';
 import RequestProgressTracker from '@/app/components/requests/RequestProgressTracker';
@@ -14,6 +14,7 @@ export default function RequestDetailsModal({
   loading = false,
   onApprove,
   onReject,
+  onHardCopySubmitted,
   onReadyForPickup,
   onComplete
 }) {
@@ -121,6 +122,27 @@ export default function RequestDetailsModal({
 
   if (!isOpen || !requestDetails) return null;
   const normalizedStatus = requestDetails.status?.toLowerCase().replace(/[\s_-]+/g, '-') || '';
+  const residentName = requestDetails.resident
+    || requestDetails.residentName
+    || requestDetails.residentFullName
+    || 'N/A';
+  const residentInfoItems = [
+    { label: 'Name', value: residentName, icon: User },
+    { label: 'Contact Number', value: requestDetails.phoneNumber || requestDetails.residentPhoneNumber, icon: Phone },
+    { label: 'Email', value: requestDetails.email || requestDetails.residentEmail, icon: Mail },
+    { label: 'Address', value: requestDetails.address || requestDetails.residentAddress, icon: MapPin },
+  ].filter(({ value }) => value);
+  const parseRequirements = (value) => {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (!value || typeof value !== 'string') return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  };
+  const hardCopyRequirements = parseRequirements(requestDetails.hardCopyRequirements);
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -177,7 +199,7 @@ export default function RequestDetailsModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className="relative bg-white rounded-2xl shadow-sm max-w-4xl w-full mx-auto overflow-hidden ring-1 ring-black/5"
+        className="relative mx-auto flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5"
       >
         {/* Header */}
         <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-4 border-b border-slate-200">
@@ -201,7 +223,7 @@ export default function RequestDetailsModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 max-h-[70vh] overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div>
@@ -240,163 +262,166 @@ export default function RequestDetailsModal({
                 </div>
               </div>
 
-              {/* Request Information */}
-              <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <Info className="w-5 h-5" />
-                  Request Information
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Document Type</label>
-                      <p className="text-sm font-medium text-slate-900">{requestDetails.documentName}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Request ID</label>
-                      <p className="text-sm font-medium text-slate-900">#{requestDetails.id || requestDetails.requestId}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Status</label>
-                      <div className="mt-1">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(requestDetails.status)}`}>
-                          {requestDetails.status}
-                        </span>
+              <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(220px,0.85fr)_minmax(0,1.35fr)_minmax(240px,1fr)]">
+                <aside className="flex flex-col space-y-2 opacity-90">
+                  <h4 className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-700">
+                    <User className="h-3.5 w-3.5 text-[#243b8e] opacity-70" />
+                    Resident Basic Information
+                  </h4>
+                  <div className="flex-1 space-y-2 rounded-xl border border-slate-100/80 bg-slate-50/60 p-2">
+                    {residentInfoItems.map(({ label, value, icon: Icon }) => (
+                      <div key={label} className="flex min-w-0 items-start gap-2 rounded-lg bg-white/80 p-2 ring-1 ring-slate-100/80">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#eef3ff]/70">
+                          <Icon className="h-3.5 w-3.5 text-[#243b8e] opacity-75" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+                          <p className="break-words text-xs font-semibold leading-snug text-slate-800" title={value}>{value}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </aside>
+
+                <div className="flex flex-col space-y-2">
+                  <div>
+                    <h4 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-900">
+                      <FileText className="h-4 w-4 text-[#243b8e]" />
+                      Document Information
+                    </h4>
+                    <div className="grid gap-2">
+                      <div className="relative overflow-hidden rounded-lg border border-[#c2cbea] bg-gradient-to-br from-[#eef3ff] via-white to-white p-3 shadow-sm">
+                        <div className="absolute inset-y-0 left-0 w-1 bg-[#243b8e]" aria-hidden="true" />
+                        <div className="flex items-start gap-2 pl-1">
+                          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white text-[#243b8e] ring-1 ring-[#d8def2]">
+                            <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#243b8e]">Document Name</p>
+                            <p className="mt-0.5 font-[family-name:var(--font-montserrat)] text-sm font-extrabold leading-none text-[#00114e]">{requestDetails.documentName}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Request ID</p>
+                          <p className="mt-1 text-sm font-bold text-slate-900">#{requestDetails.id || requestDetails.requestId}</p>
+                        </div>
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Status</p>
+                          <span className={`mt-1 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(requestDetails.status)}`}>
+                            {requestDetails.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Date Submitted</p>
+                          <p className="mt-1 flex items-center gap-2 text-sm font-bold text-slate-900">
+                            <Calendar className="h-4 w-4 text-[#243b8e]" />
+                            {requestDetails.submittedAt ? formatDate(requestDetails.submittedAt) : 'Unknown'}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Time Submitted</p>
+                          <p className="mt-1 flex items-center gap-2 text-sm font-bold text-slate-900">
+                            <Clock className="h-4 w-4 text-[#243b8e]" />
+                            {requestDetails.submittedAt ? formatTime(requestDetails.submittedAt) : 'Unknown'}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Date Submitted</label>
-                      <p className="text-sm font-medium text-slate-900 flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        {requestDetails.submittedAt ? formatDate(requestDetails.submittedAt) : 'Unknown'}
+
+                  <div className="flex flex-1 flex-col">
+                    <h4 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-900">
+                      <ClipboardList className="h-4 w-4 text-[#243b8e]" />
+                      Purpose & Details
+                    </h4>
+                    <div className="flex-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
+                        {requestDetails.details || 'No purpose provided.'}
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col space-y-3">
+                  {hardCopyRequirements.length > 0 && (
                     <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Time Submitted</label>
-                      <p className="text-sm font-medium text-slate-900 flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        {requestDetails.submittedAt ? formatTime(requestDetails.submittedAt) : 'Unknown'}
-                      </p>
-                    </div>
-                    {requestDetails.updatedAt && (
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Last Updated</label>
-                        <p className="text-sm font-medium text-slate-900">
-                          {formatDate(requestDetails.updatedAt)} at {formatTime(requestDetails.updatedAt)}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Resident Information */}
-              {requestDetails.resident && (
-                <div className="bg-white rounded-xl border border-slate-200 p-6">
-                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                    <User className="w-5 h-5" />
-                    Resident Information
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Full Name</label>
-                      <p className="text-sm font-medium text-slate-900">{requestDetails.resident}</p>
-                    </div>
-                    {requestDetails.email && (
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Email Address</label>
-                        <p className="text-sm font-medium text-slate-900">{requestDetails.email}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Request Details/Purpose */}
-              {requestDetails.details && (
-                <div className="bg-white rounded-xl border border-slate-200 p-6">
-                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    Purpose/Details
-                  </h4>
-                  <div className="bg-slate-50 rounded-lg p-4">
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{requestDetails.details}</p>
-                  </div>
-                </div>
-              )}
-
-              <AiReviewPanel requestId={requestDetails.id || requestDetails.requestId} />
-
-              {/* Attachments - NEW SECURE DOWNLOAD SECTION */}
-              {(attachments.length > 0 || requestDetails.attachmentCount > 0) && (
-                <div className="bg-white rounded-xl border border-slate-200 p-6">
-                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                    <Paperclip className="w-5 h-5" />
-                    Attachments
-                  </h4>
-                  
-                  {attachments.length > 0 ? (
-                    <div className="space-y-3">
-                      <p className="text-sm text-slate-600 mb-4">
-                        {attachments.length} attachment{attachments.length !== 1 ? 's' : ''} available for download.
-                      </p>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {attachments.map((file) => (
-                          <div 
-                            key={file.id} 
-                            className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
-                          >
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <div className="bg-[#d8def2] p-2 rounded-md flex-shrink-0">
-                                <FileText className="w-4 h-4 text-[#243b8e]" />
-                              </div>
-                              <div className="overflow-hidden">
-                                <p className="text-sm font-medium text-slate-900 truncate">
-                                  {file.fileName}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {isDownloading[file.id] ? 'Downloading...' : 'Click to download'}
-                                </p>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handleDownloadAttachment(file)}
-                              disabled={isDownloading[file.id]}
-                              className="p-2 text-slate-400 hover:text-[#243b8e] hover:bg-[#eef3ff] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                              title="Download file"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
+                      <h4 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-900">
+                        <ClipboardCheck className="h-4 w-4 text-[#243b8e]" />
+                        Hard Copy Requirements
+                      </h4>
+                      <div className="grid gap-2">
+                        {hardCopyRequirements.map((requirement, index) => (
+                          <div key={`shared-hard-copy-${requirement}-${index}`} className="flex gap-2 rounded-lg border border-[#c2cbea] bg-[#eef3ff]/70 px-3 py-2 text-xs font-semibold text-slate-700">
+                            <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600" />
+                            <span className="break-words">{requirement}</span>
                           </div>
                         ))}
                       </div>
                     </div>
+                  )}
+
+                  <div className="flex flex-1 flex-col">
+                    <h4 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-900">
+                      <Paperclip className="h-4 w-4 text-[#243b8e]" />
+                      Attached Requirements
+                    </h4>
+
+                  {attachments.length > 0 ? (
+                    <div className="grid gap-2">
+                      {attachments.map((file) => (
+                        <div 
+                          key={file.id} 
+                          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-2 transition-colors hover:bg-slate-50"
+                        >
+                          <div className="flex min-w-0 items-center gap-3 overflow-hidden">
+                            <div className="flex-shrink-0 rounded-md bg-[#eef3ff] p-2">
+                              <FileText className="h-4 w-4 text-[#243b8e]" />
+                            </div>
+                            <div className="min-w-0 overflow-hidden">
+                              <p className="truncate text-sm font-medium text-slate-900">
+                                {file.fileName}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {isDownloading[file.id] ? 'Downloading...' : 'Click to download'}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDownloadAttachment(file)}
+                            disabled={isDownloading[file.id]}
+                            className="flex-shrink-0 rounded-full p-2 text-slate-400 transition-colors hover:bg-[#eef3ff] hover:text-[#243b8e] disabled:cursor-not-allowed disabled:opacity-50"
+                            title="Download file"
+                          >
+                            <Download className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : requestDetails.attachmentCount > 0 ? (
+                    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-500">
+                      {requestDetails.attachmentCount} attached requirement{requestDetails.attachmentCount !== 1 ? 's' : ''}.
+                    </div>
                   ) : (
-                    <div className="space-y-2">
-                      <p className="text-sm text-slate-600">
-                        This request has {requestDetails.attachmentCount} attachment{requestDetails.attachmentCount !== 1 ? 's' : ''}.
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {Array.from({ length: requestDetails.attachmentCount }, (_, i) => (
-                          <span key={i} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#d8def2] text-[#122361] border border-[#c2cbea]">
-                            <Paperclip className="w-3 h-3 mr-1" />
-                            Attachment {i + 1}
-                          </span>
-                        ))}
-                      </div>
+                    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-500">
+                      No attached requirements.
                     </div>
                   )}
+                  </div>
                 </div>
-              )}
+              </div>
+
+              <AiReviewPanel requestId={requestDetails.id || requestDetails.requestId} />
             </div>
           )}
         </div>
 
         {/* Footer Actions */}
         {!loading && (
-          <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex gap-3">
+          <div className="sticky bottom-0 z-20 flex shrink-0 gap-3 border-t border-slate-200 bg-slate-50/95 px-6 py-4 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
             {/* Action buttons based on status */}
             {normalizedStatus === 'pending' && (
               <>
@@ -416,7 +441,16 @@ export default function RequestDetailsModal({
                 </button>
               </>
             )}
-            {normalizedStatus === 'approved' && onReadyForPickup && (
+            {normalizedStatus === 'awaiting-hard-copy-submission' && onHardCopySubmitted && (
+              <button
+                onClick={() => onHardCopySubmitted(requestDetails.id || requestDetails.requestId)}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0]"
+              >
+                <ClipboardCheck className="w-5 h-5" />
+                Mark Hard Copy Received
+              </button>
+            )}
+            {(normalizedStatus === 'approved' || normalizedStatus === 'hard-copy-submitted') && onReadyForPickup && (
               <button
                 onClick={() => onReadyForPickup(requestDetails.id || requestDetails.requestId)}
                 className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0]"
@@ -434,15 +468,13 @@ export default function RequestDetailsModal({
                 Mark as Completed
               </button>
             )}
-            {/* For completed requests, show close button only */}
-            {normalizedStatus === 'completed' && (
-              <button
-                onClick={onClose}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium transition-colors bg-gray-600 text-white hover:bg-gray-700"
-              >
-                Close
-              </button>
-            )}
+            <button
+              onClick={onClose}
+              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-slate-300 bg-white font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+            >
+              <XCircle className="w-5 h-5" />
+              Close
+            </button>
           </div>
         )}
       </motion.div>

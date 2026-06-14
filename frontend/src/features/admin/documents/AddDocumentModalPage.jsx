@@ -45,6 +45,8 @@ const initialFormData = {
     processingTimeUnit: 'days',
     pdfPath: '',
     requirements: [],
+    hardCopySubmissionRequired: false,
+    hardCopyRequirements: [],
     uses: [],
   },
 };
@@ -192,6 +194,8 @@ export default function AddDocumentModalPage({
   const [isMinimized, setIsMinimized] = useState(initialMinimized);
   const [refreshPromptOpen, setRefreshPromptOpen] = useState(false);
   const [requirementsText, setRequirementsText] = useState('');
+  const [hardCopySubmissionRequired, setHardCopySubmissionRequired] = useState(false);
+  const [selectedHardCopyRequirements, setSelectedHardCopyRequirements] = useState([]);
   const [usesText, setUsesText] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [pdfFile, setPdfFile] = useState(null);
@@ -204,6 +208,8 @@ export default function AddDocumentModalPage({
     formData.details.longDescription ||
     formData.details.processingTimeValue ||
     requirementsText.trim() ||
+    hardCopySubmissionRequired ||
+    selectedHardCopyRequirements.length > 0 ||
     usesText.trim() ||
     imageFile ||
     pdfFile,
@@ -227,6 +233,8 @@ export default function AddDocumentModalPage({
       formData,
       generatedId,
       requirementsText,
+      hardCopySubmissionRequired,
+      selectedHardCopyRequirements,
       usesText,
       imageFileName: imageFile?.name || '',
       pdfFileName: pdfFile?.name || '',
@@ -262,6 +270,14 @@ export default function AddDocumentModalPage({
     setPendingNavigationHref('');
   };
 
+  const toggleHardCopyRequirement = (requirement) => {
+    setSelectedHardCopyRequirements((currentRequirements) => (
+      currentRequirements.includes(requirement)
+        ? currentRequirements.filter((item) => item !== requirement)
+        : [...currentRequirements, requirement]
+    ));
+  };
+
   useEffect(() => {
     const storedDraft = readStoredDraft();
 
@@ -269,6 +285,8 @@ export default function AddDocumentModalPage({
       setFormData(storedDraft.formData);
       setGeneratedId(storedDraft.generatedId || '');
       setRequirementsText(storedDraft.requirementsText || '');
+      setHardCopySubmissionRequired(Boolean(storedDraft.hardCopySubmissionRequired));
+      setSelectedHardCopyRequirements(storedDraft.selectedHardCopyRequirements || []);
       setUsesText(storedDraft.usesText || '');
     }
 
@@ -284,7 +302,7 @@ export default function AddDocumentModalPage({
     }
 
     clearStoredDraft();
-  }, [formData, generatedId, hasDraft, hydrated, imageFile, loading, pdfFile, requirementsText, usesText]);
+  }, [formData, generatedId, hardCopySubmissionRequired, hasDraft, hydrated, imageFile, loading, pdfFile, requirementsText, selectedHardCopyRequirements, usesText]);
 
   useEffect(() => {
     const shouldProtectDraft = isMinimized && hasDraft && !loading;
@@ -344,6 +362,18 @@ export default function AddDocumentModalPage({
       return;
     }
 
+    const requirements = normalizeListItems(requirementsText);
+    const hardCopyRequirements = selectedHardCopyRequirements.filter((requirement) => requirements.includes(requirement));
+
+    if (hardCopySubmissionRequired && hardCopyRequirements.length === 0) {
+      setNotification({
+        type: 'error',
+        title: 'Hard Copy Requirements Needed',
+        message: 'Select at least one existing requirement for hard-copy submission.',
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -367,7 +397,9 @@ export default function AddDocumentModalPage({
           ...formData.details,
           processingTime,
           pdfPath,
-          requirements: normalizeListItems(requirementsText),
+          requirements,
+          hardCopySubmissionRequired,
+          hardCopyRequirements: hardCopySubmissionRequired ? hardCopyRequirements : [],
           uses: normalizeListItems(usesText),
         },
       };
@@ -633,6 +665,57 @@ export default function AddDocumentModalPage({
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
                     <p className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
+                      <FileText className="h-4 w-4 text-[#243b8e]" />
+                      Hard copy submission
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">
+                      Physical documents residents must submit at the barangay office.
+                    </p>
+                  </div>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[#c2cbea] bg-[#eef3ff] px-3 py-1.5 text-xs font-extrabold text-[#122361]">
+                    <input
+                      type="checkbox"
+                      checked={hardCopySubmissionRequired}
+                      onChange={(event) => setHardCopySubmissionRequired(event.target.checked)}
+                      className="h-4 w-4 accent-[#243b8e]"
+                    />
+                    Required
+                  </label>
+                </div>
+                {hardCopySubmissionRequired ? (
+                  normalizeListItems(requirementsText).length > 0 ? (
+                    <div className="space-y-2">
+                      {normalizeListItems(requirementsText).map((requirement, index) => (
+                        <label
+                          key={`hard-copy-option-${requirement}-${index}`}
+                          className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700 transition hover:border-[#c2cbea] hover:bg-[#eef3ff]/70"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedHardCopyRequirements.includes(requirement)}
+                            onChange={() => toggleHardCopyRequirement(requirement)}
+                            className="mt-0.5 h-4 w-4 accent-[#243b8e]"
+                          />
+                          <span>{requirement}</span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-2xl border border-dashed border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                      Add upload requirements first, then select which of them also require hard-copy submission.
+                    </p>
+                  )
+                ) : (
+                  <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-500">
+                    Turn this on only when residents must bring physical documents before pickup.
+                  </p>
+                )}
+              </section>
+
+              <section className="rounded-3xl border border-[#d8def2] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       Common uses
                     </p>
@@ -753,6 +836,8 @@ export default function AddDocumentModalPage({
                     formData,
                     generatedId,
                     requirementsText,
+                    hardCopySubmissionRequired,
+                    selectedHardCopyRequirements,
                     usesText,
                     imageFileName: imageFile?.name || '',
                     pdfFileName: pdfFile?.name || '',

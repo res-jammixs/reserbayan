@@ -18,6 +18,8 @@ public class DocumentTypeDTO {
         private String processingTime;
         private String pdfPath;
         private List<String> requirements;
+        private Boolean hardCopySubmissionRequired;
+        private List<String> hardCopyRequirements;
         private List<String> uses;
 
         // Getters and Setters
@@ -59,6 +61,22 @@ public class DocumentTypeDTO {
 
         public void setRequirements(List<String> requirements) {
             this.requirements = requirements;
+        }
+
+        public Boolean getHardCopySubmissionRequired() {
+            return hardCopySubmissionRequired;
+        }
+
+        public void setHardCopySubmissionRequired(Boolean hardCopySubmissionRequired) {
+            this.hardCopySubmissionRequired = hardCopySubmissionRequired;
+        }
+
+        public List<String> getHardCopyRequirements() {
+            return hardCopyRequirements;
+        }
+
+        public void setHardCopyRequirements(List<String> hardCopyRequirements) {
+            this.hardCopyRequirements = hardCopyRequirements;
         }
 
         public List<String> getUses() {

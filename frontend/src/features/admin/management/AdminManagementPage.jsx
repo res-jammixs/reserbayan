@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Users, Shield, Eye, Settings, Trash2, Key, Plus, CheckCircle, XCircle, Search, MoreVertical, Edit, EyeOff, Crown, UserX, FileText, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Users, Shield, Eye, Settings, Trash2, Key, Plus, CheckCircle, XCircle, Search, MoreVertical, Edit, EyeOff, Crown, UserX, FileText, AlertTriangle, ChevronDown, ClipboardCheck } from 'lucide-react';
 import NotificationModal from '@/shared/components/modals/NotificationModal';
 import ConfirmationModal from '@/shared/components/modals/ConfirmationModal';
 import ViewDetailsModal from '@/shared/components/modals/ViewDetailsModal';
@@ -962,6 +962,47 @@ function AdminManagementContent({ variant = 'superadmin' }) {
     });
   };
 
+  const handleHardCopySubmittedDocument = async (item) => {
+    const displayName = item.resident ?
+      [item.resident.firstName, item.resident.lastName].filter(name => name && name.trim()).join(' ').trim() || 'Unknown Resident' :
+      'Unknown Resident';
+
+    setConfirmationModal({
+      type: 'complete',
+      title: 'Mark Hard Copy Received',
+      message: `Confirm that ${displayName} has submitted the required hard-copy documents.`,
+      confirmText: 'Mark Received',
+      confirmButtonClass: 'bg-[#243b8e] hover:bg-[#122361]',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${apiBase}/requests/${item.requestId}/hard-copy-submitted`, {
+            method: 'PUT',
+            headers: token ? {
+              'Authorization': `Bearer ${token}`,
+            } : {},
+          });
+          if (!response.ok) throw new Error('Failed to mark hard-copy requirements received');
+
+          fetchData(activeTab, true);
+          setNotificationModal({
+            type: 'success',
+            title: 'Hard Copy Received',
+            message: 'Hard-copy requirements have been marked as received.',
+            autoClose: true,
+            autoCloseDelay: 3000
+          });
+        } catch (err) {
+          setNotificationModal({
+            type: 'error',
+            title: 'Update Failed',
+            message: 'Error marking hard-copy requirements received: ' + err.message
+          });
+        }
+      }
+    });
+  };
+
   const handleToggleAdminStatus = async (item) => {
     const newStatus = item.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     setConfirmationModal({
@@ -1048,7 +1089,7 @@ function AdminManagementContent({ variant = 'superadmin' }) {
       }
 
       if (activeTab === 'document-requests' && statusFilter && statusFilter.trim() !== '') {
-        if (item.status !== statusFilter) return false;
+        if (normalizeWorkflowStatus(item.status) !== normalizeWorkflowStatus(statusFilter)) return false;
       }
 
       if (!searchQuery.trim()) return true;
@@ -1136,7 +1177,7 @@ function AdminManagementContent({ variant = 'superadmin' }) {
                 <CurrentTabIcon className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-xl font-extrabold text-[#122361]">{currentTabConfig.label}</h2>
+                <h2 className="font-[family-name:var(--font-montserrat)] text-xl font-extrabold text-[#122361]">{currentTabConfig.label}</h2>
                 <p className="text-sm text-slate-500">{filteredData.length} visible of {data.length} records</p>
               </div>
             </div>
@@ -1169,6 +1210,8 @@ function AdminManagementContent({ variant = 'superadmin' }) {
                       { value: '', label: 'All Status' },
                       { value: 'Pending', label: 'Pending' },
                       { value: 'Approved', label: 'Approved' },
+                      { value: 'Awaiting Hard Copy Submission', label: 'Awaiting Hard Copy' },
+                      { value: 'Hard Copy Submitted', label: 'Hard Copy Submitted' },
                       { value: 'Ready for Pickup', label: 'Ready for Pickup' },
                       { value: 'Completed', label: 'Completed' },
                       { value: 'Rejected', label: 'Rejected' },
@@ -1310,7 +1353,9 @@ function AdminManagementContent({ variant = 'superadmin' }) {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {activeTab === 'document-requests' ? item.documentName : item.residentEmail}
+                          {activeTab === 'document-requests' ? (
+                            <span className="font-[family-name:var(--font-montserrat)] font-semibold text-[#122361]">{item.documentName}</span>
+                          ) : item.residentEmail}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {activeTab === 'document-requests' ? (item.submittedAt ? new Date(item.submittedAt).toLocaleDateString() : 'N/A') : item.phoneNumber || 'N/A'}
@@ -1329,6 +1374,8 @@ function AdminManagementContent({ variant = 'superadmin' }) {
                               // Using a temporary variable to normalize status case for simpler check
                               ['COMPLETED', 'Completed'].includes(item.status) ? 'bg-green-100 text-green-800' :
                               ['READY FOR PICKUP', 'Ready for Pickup'].includes(item.status) ? 'bg-[#eef3ff] text-[#122361]' :
+                              ['AWAITING HARD COPY SUBMISSION', 'Awaiting Hard Copy Submission'].includes(item.status) ? 'bg-amber-50 text-amber-700' :
+                              ['HARD COPY SUBMITTED', 'Hard Copy Submitted'].includes(item.status) ? 'bg-[#eef3ff] text-[#122361]' :
                               ['PENDING', 'Pending'].includes(item.status) ? 'bg-yellow-100 text-yellow-800' :
                               ['APPROVED', 'Approved'].includes(item.status) ? 'bg-[#d8def2] text-[#122361]' :
                               ['REJECTED', 'Rejected'].includes(item.status) ? 'bg-red-100 text-red-800' :
@@ -1528,6 +1575,32 @@ function AdminManagementContent({ variant = 'superadmin' }) {
                               </>
                             )}
                             {workflowStatus === 'approved' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReadyForPickupDocument(item);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm font-semibold text-[#122361] hover:bg-[#eef3ff] rounded-lg flex items-center gap-2"
+                              >
+                                <FileText size={16} />
+                                Mark Ready for Pick Up
+                              </button>
+                            )}
+                            {workflowStatus === 'awaiting-hard-copy-submission' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleHardCopySubmittedDocument(item);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm font-semibold text-[#122361] hover:bg-[#eef3ff] rounded-lg flex items-center gap-2"
+                              >
+                                <ClipboardCheck size={16} />
+                                Mark Hard Copy Received
+                              </button>
+                            )}
+                            {workflowStatus === 'hard-copy-submitted' && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1770,6 +1843,27 @@ function AdminManagementContent({ variant = 'superadmin' }) {
               fetchData(activeTab, true);
             }}
             cancelRequest={async () => ({ success: false, error: `Not supported in ${basePath} view` })}
+            hardCopySubmittedRequest={async (requestId) => {
+              const token = localStorage.getItem('token');
+              const response = await fetch(`${apiBase}/requests/${requestId}/hard-copy-submitted`, {
+                method: 'PUT',
+                headers: token ? {
+                  'Authorization': `Bearer ${token}`,
+                } : {},
+              });
+              const responseText = await response.text().catch(() => '');
+              if (!response.ok) {
+                throw new Error(responseText || 'Failed to mark hard-copy requirements received.');
+              }
+              if (!responseText.trim()) {
+                return {};
+              }
+              try {
+                return JSON.parse(responseText);
+              } catch {
+                return {};
+              }
+            }}
             readyForPickupRequest={async (requestId) => {
               const token = localStorage.getItem('token');
               const response = await fetch(`${apiBase}/requests/${requestId}/ready-for-pickup`, {

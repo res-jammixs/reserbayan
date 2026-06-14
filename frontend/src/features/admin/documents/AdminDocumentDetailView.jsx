@@ -78,6 +78,8 @@ function createEditDraft(documentItem) {
       processingTime: documentItem?.details?.processingTime || '',
       pdfPath: documentItem?.details?.pdfPath || '',
       requirements: documentItem?.details?.requirements || [],
+      hardCopySubmissionRequired: Boolean(documentItem?.details?.hardCopySubmissionRequired),
+      hardCopyRequirements: documentItem?.details?.hardCopyRequirements || [],
       uses: documentItem?.details?.uses || [],
     },
   };
@@ -211,6 +213,8 @@ function AdminDocumentDetailContent() {
   const [processingTimeDraft, setProcessingTimeDraft] = useState({ amount: '', unit: 'minutes' });
   const [requirementsDraft, setRequirementsDraft] = useState([]);
   const [requirementInput, setRequirementInput] = useState('');
+  const [hardCopySubmissionRequired, setHardCopySubmissionRequired] = useState(false);
+  const [selectedHardCopyRequirements, setSelectedHardCopyRequirements] = useState([]);
   const [usesText, setUsesText] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [pdfFile, setPdfFile] = useState(null);
@@ -249,6 +253,8 @@ function AdminDocumentDetailContent() {
   }, [id]);
 
   const requirements = useMemo(() => documentItem?.details?.requirements || [], [documentItem]);
+  const hardCopySubmissionRequiredView = Boolean(documentItem?.details?.hardCopySubmissionRequired);
+  const hardCopyRequirements = useMemo(() => documentItem?.details?.hardCopyRequirements || [], [documentItem]);
   const uses = useMemo(() => documentItem?.details?.uses || [], [documentItem]);
   const imageSource = getImageSource(documentItem?.imagePath);
   const documentTypeId = getDocumentTypeId(documentItem, id);
@@ -288,6 +294,8 @@ function AdminDocumentDetailContent() {
     setEditDraft(nextDraft);
     setProcessingTimeDraft(parseProcessingTime(nextDraft.details.processingTime));
     setRequirementsDraft(nextDraft.details.requirements);
+    setHardCopySubmissionRequired(Boolean(nextDraft.details.hardCopySubmissionRequired));
+    setSelectedHardCopyRequirements(nextDraft.details.hardCopyRequirements || []);
     setUsesText(nextDraft.details.uses.join('\n'));
     setRequirementInput('');
     setImageFile(null);
@@ -313,6 +321,8 @@ function AdminDocumentDetailContent() {
     setProcessingTimeDraft({ amount: '', unit: 'minutes' });
     setRequirementsDraft([]);
     setRequirementInput('');
+    setHardCopySubmissionRequired(false);
+    setSelectedHardCopyRequirements([]);
     setUsesText('');
     setImageFile(null);
     setPdfFile(null);
@@ -373,6 +383,14 @@ function AdminDocumentDetailContent() {
     )));
   };
 
+  const toggleHardCopyRequirement = (requirement) => {
+    setSelectedHardCopyRequirements((currentRequirements) => (
+      currentRequirements.includes(requirement)
+        ? currentRequirements.filter((item) => item !== requirement)
+        : [...currentRequirements, requirement]
+    ));
+  };
+
   const handleEditSubmit = async (event) => {
     event.preventDefault();
     if (!editDraft) return;
@@ -382,6 +400,20 @@ function AdminDocumentDetailContent() {
         type: 'warning',
         title: 'Required details missing',
         message: 'Document name and short description are required.',
+      });
+      return;
+    }
+
+    const normalizedRequirements = normalizeListItems(requirementsDraft);
+    const hardCopyRequirementsDraft = selectedHardCopyRequirements.filter((requirement) => normalizedRequirements.includes(requirement));
+
+    if (hardCopySubmissionRequired && hardCopyRequirementsDraft.length === 0) {
+      setNotificationModal({
+        type: 'warning',
+        title: 'Hard copy requirements missing',
+        message: 'Select at least one existing requirement for hard-copy submission.',
+        zIndexClass: 'z-[140]',
+        backdropBlur: false,
       });
       return;
     }
@@ -409,7 +441,9 @@ function AdminDocumentDetailContent() {
           ...editDraft.details,
           processingTime: formatProcessingTime(processingTimeDraft),
           pdfPath,
-          requirements: normalizeListItems(requirementsDraft),
+          requirements: normalizedRequirements,
+          hardCopySubmissionRequired,
+          hardCopyRequirements: hardCopySubmissionRequired ? hardCopyRequirementsDraft : [],
           uses: normalizeListItems(usesText.split('\n')),
         },
       };
@@ -582,7 +616,7 @@ function AdminDocumentDetailContent() {
                 </div>
               </div>
 
-              <h1 className="mt-4 text-3xl font-extrabold uppercase leading-tight tracking-tight text-[#122361] lg:text-4xl">
+              <h1 className="mt-4 font-[family-name:var(--font-montserrat)] text-3xl font-extrabold uppercase leading-tight tracking-tight text-[#122361] lg:text-4xl">
                 {documentItem.name}
               </h1>
 
@@ -590,7 +624,7 @@ function AdminDocumentDetailContent() {
                 {documentItem.details?.longDescription || documentItem.shortDescription || 'No long description has been provided yet.'}
               </p>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="mt-5 grid gap-3 sm:grid-cols-4">
                 <div className="rounded-2xl border border-[#d8def2] bg-[#eef3ff]/70 p-4">
                   <Clock3 className="h-5 w-5 text-[#122361]" />
                   <p className="mt-2 text-xs font-bold uppercase tracking-wide text-[#2f84c0]">Processing</p>
@@ -606,9 +640,16 @@ function AdminDocumentDetailContent() {
                   <p className="mt-2 text-xs font-bold uppercase tracking-wide text-[#2f84c0]">Visibility</p>
                   <p className="mt-1 text-sm font-extrabold text-slate-800">Resident-facing</p>
                 </div>
+                <div className="rounded-2xl border border-[#d8def2] bg-white p-4 shadow-sm">
+                  <FileText className="h-5 w-5 text-[#122361]" />
+                  <p className="mt-2 text-xs font-bold uppercase tracking-wide text-[#2f84c0]">Hard Copy</p>
+                  <p className="mt-1 text-sm font-extrabold text-slate-800">
+                    {hardCopySubmissionRequiredView ? `${hardCopyRequirements.length} items` : 'Not required'}
+                  </p>
+                </div>
               </div>
 
-              <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
                 <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
                   <div className="flex items-center gap-2">
                     <Info className="h-5 w-5 text-[#122361]" />
@@ -649,6 +690,25 @@ function AdminDocumentDetailContent() {
                     <p className="mt-2 text-sm text-slate-500">No listed requirements for this document.</p>
                   )}
                 </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-[#122361]" />
+                    <h2 className="text-lg font-extrabold text-[#122361]">Hard Copy Submission</h2>
+                  </div>
+                  {hardCopySubmissionRequiredView ? (
+                    <ul className="mt-3 space-y-2">
+                      {hardCopyRequirements.map((requirement, index) => (
+                        <li key={`hard-copy-${requirement}-${index}`} className="flex gap-2 text-sm font-semibold leading-6 text-slate-700">
+                          <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-600" />
+                          {requirement}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-500">No physical submission required for this document.</p>
+                  )}
+                </div>
               </div>
 
             </div>
@@ -682,13 +742,22 @@ function AdminDocumentDetailContent() {
 
       <AnimatePresence>
         {isEditDrawerOpen && editDraft && (
-          <motion.aside
-            className="fixed bottom-0 right-0 top-[73px] z-[55] flex w-full max-w-[min(52vw,920px)] flex-col overflow-hidden border-l border-[#d8def2] bg-white shadow-[0_8px_20px_rgba(15,23,42,0.08)] max-lg:max-w-[min(92vw,720px)]"
-            initial={{ x: '100%', opacity: 0.7 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: '100%', opacity: 0.7 }}
-            transition={{ duration: 0.34, ease: 'easeOut' }}
-          >
+          <>
+            <motion.div
+              className="fixed bottom-0 left-0 right-0 top-[73px] z-[54] bg-slate-950/25 backdrop-blur-[2px]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.24, ease: 'easeOut' }}
+              onClick={() => closeEditDrawer()}
+            />
+            <motion.aside
+              className="fixed bottom-0 right-0 top-[73px] z-[55] flex w-full max-w-[min(52vw,920px)] flex-col overflow-hidden border-l border-[#d8def2] bg-white shadow-[0_8px_20px_rgba(15,23,42,0.08)] max-lg:max-w-[min(92vw,720px)]"
+              initial={{ x: '100%', opacity: 0.7 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0.7 }}
+              transition={{ duration: 0.34, ease: 'easeOut' }}
+            >
             <div className="relative overflow-hidden border-b border-[#d8def2] bg-gradient-to-br from-[#122361] via-[#243b8e] to-[#2f84c0] p-5 text-white">
               <div className="absolute -right-12 -top-14 h-40 w-40 rounded-full bg-white/15" />
               <div className="relative flex items-start justify-between gap-4">
@@ -872,6 +941,57 @@ function AdminDocumentDetailContent() {
                 </section>
 
                 <section className="rounded-3xl border border-[#d8def2] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
+                        <FileText className="h-4 w-4 text-[#243b8e]" />
+                        Hard copy submission
+                      </p>
+                      <p className="mt-1 text-xs font-medium text-slate-500">
+                        Physical requirements submitted at the barangay office.
+                      </p>
+                    </div>
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[#c2cbea] bg-[#eef3ff] px-3 py-1.5 text-xs font-extrabold text-[#122361]">
+                      <input
+                        type="checkbox"
+                        checked={hardCopySubmissionRequired}
+                        onChange={(event) => setHardCopySubmissionRequired(event.target.checked)}
+                        className="h-4 w-4 accent-[#243b8e]"
+                      />
+                      Required
+                    </label>
+                  </div>
+                  {hardCopySubmissionRequired ? (
+                    normalizeListItems(requirementsDraft).length > 0 ? (
+                      <div className="space-y-2">
+                        {normalizeListItems(requirementsDraft).map((requirement, index) => (
+                          <label
+                            key={`edit-hard-copy-option-${requirement}-${index}`}
+                            className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700 transition hover:border-[#c2cbea] hover:bg-[#eef3ff]/70"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedHardCopyRequirements.includes(requirement)}
+                              onChange={() => toggleHardCopyRequirement(requirement)}
+                              className="mt-0.5 h-4 w-4 accent-[#243b8e]"
+                            />
+                            <span>{requirement}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="rounded-2xl border border-dashed border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                        Add requirements first, then select which of them also require hard-copy submission.
+                      </p>
+                    )
+                  ) : (
+                    <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-500">
+                      Turn this on only when residents must submit physical copies before pickup.
+                    </p>
+                  )}
+                </section>
+
+                <section className="rounded-3xl border border-[#d8def2] bg-white p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
                   <label className="block">
                     <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Common uses, one per line</span>
                     <textarea
@@ -949,7 +1069,8 @@ function AdminDocumentDetailContent() {
                 </div>
               </div>
             </form>
-          </motion.aside>
+            </motion.aside>
+          </>
         )}
       </AnimatePresence>
 

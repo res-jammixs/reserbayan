@@ -23,6 +23,20 @@ export function StatusBadge({ status, className = '', size = 'md' }) {
         textColor: 'text-[#122361]',
         borderColor: 'border-[#c2cbea]'
       },
+      'awaiting-hard-copy-submission': {
+        icon: Clock,
+        iconColor: 'text-amber-600',
+        bgColor: 'bg-amber-50',
+        textColor: 'text-amber-700',
+        borderColor: 'border-amber-200'
+      },
+      'hard-copy-submitted': {
+        icon: CheckCircle,
+        iconColor: 'text-[#2f84c0]',
+        bgColor: 'bg-[#eef3ff]',
+        textColor: 'text-[#122361]',
+        borderColor: 'border-[#c2cbea]'
+      },
       completed: {
         icon: CheckCircle,
         iconColor: 'text-[#243b8e]',

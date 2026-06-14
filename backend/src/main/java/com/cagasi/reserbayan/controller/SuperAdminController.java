@@ -39,10 +39,14 @@ import com.cagasi.reserbayan.repository.StatusLogRepository;
 import com.cagasi.reserbayan.service.AnnouncementService;
 import com.cagasi.reserbayan.service.AdminNotificationService;
 import com.cagasi.reserbayan.service.NotificationService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
 @RequestMapping("/api/superadmin")
 public class SuperAdminController {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private ResidentRepository residentRepository;
@@ -126,6 +130,9 @@ public class SuperAdminController {
             requestMap.put("details", req.getDetails());
             requestMap.put("status", req.getStatus());
             requestMap.put("rejectionReason", req.getRejectionReason());
+            requestMap.put("hardCopySubmissionRequired", req.isHardCopySubmissionRequired());
+            requestMap.put("hardCopyRequirements", req.getHardCopyRequirements());
+            requestMap.put("hardCopySubmittedAt", req.getHardCopySubmittedAt());
             requestMap.put("submittedAt", req.getSubmittedAt());
             requestMap.put("updatedAt", req.getUpdatedAt());
 
@@ -177,6 +184,9 @@ public class SuperAdminController {
             requestMap.put("details", req.getDetails());
             requestMap.put("status", req.getStatus());
             requestMap.put("rejectionReason", req.getRejectionReason());
+            requestMap.put("hardCopySubmissionRequired", req.isHardCopySubmissionRequired());
+            requestMap.put("hardCopyRequirements", req.getHardCopyRequirements());
+            requestMap.put("hardCopySubmittedAt", req.getHardCopySubmittedAt());
             requestMap.put("submittedAt", req.getSubmittedAt());
             requestMap.put("updatedAt", req.getUpdatedAt());
 
@@ -217,6 +227,9 @@ public class SuperAdminController {
         requestMap.put("details", request.getDetails());
         requestMap.put("status", request.getStatus());
         requestMap.put("rejectionReason", request.getRejectionReason());
+        requestMap.put("hardCopySubmissionRequired", request.isHardCopySubmissionRequired());
+        requestMap.put("hardCopyRequirements", request.getHardCopyRequirements());
+        requestMap.put("hardCopySubmittedAt", request.getHardCopySubmittedAt());
         requestMap.put("submittedAt", request.getSubmittedAt());
         requestMap.put("updatedAt", request.getUpdatedAt());
 
@@ -244,23 +257,27 @@ public class SuperAdminController {
         if (request == null || !request.getStatus().equals("Pending")) {
             return ResponseEntity.notFound().build();
         }
-        request.setStatus("Approved");
+        boolean needsHardCopy = request.isHardCopySubmissionRequired();
+        String nextStatus = needsHardCopy ? "Awaiting Hard Copy Submission" : "Approved";
+        request.setStatus(nextStatus);
         request.setUpdatedAt(java.time.LocalDateTime.now());
         DocumentRequest savedRequest = documentRequestRepository.save(request);
 
         // Log the status change
         StatusLog statusLog = new StatusLog();
         statusLog.setDocumentRequest(savedRequest);
-        statusLog.setStatus("Approved");
+        statusLog.setStatus(nextStatus);
         statusLog.setTimestamp(java.time.LocalDateTime.now());
         statusLogRepository.save(statusLog);
 
         // Create notification for the resident
         notificationService.createNotification(
                 request.getResident(),
-                "Document Request Approved",
-                "Your request for '" + request.getDocumentName() + "' has been verified and is being prepared.",
-                "REQUEST_APPROVED",
+                needsHardCopy ? "Hard Copy Requirements Needed" : "Document Request Approved",
+                needsHardCopy
+                        ? "Your request for '" + request.getDocumentName() + "' has been verified. Please submit the required hard-copy documents at the barangay office."
+                        : "Your request for '" + request.getDocumentName() + "' has been verified and is being prepared.",
+                needsHardCopy ? "REQUEST_HARD_COPY_REQUIRED" : "REQUEST_APPROVED",
                 null,
                 AdminNotificationService.TARGET_DOCUMENT_REQUEST,
                 savedRequest.getRequestId());
@@ -274,8 +291,12 @@ public class SuperAdminController {
         if (request == null) {
             return ResponseEntity.notFound().build();
         }
-        if (!request.getStatus().equals("Approved")) {
-            return ResponseEntity.status(409).body(Map.of("error", "Only approved requests can be marked ready for pickup"));
+        String requiredStatus = request.isHardCopySubmissionRequired() ? "Hard Copy Submitted" : "Approved";
+        if (!request.getStatus().equals(requiredStatus)) {
+            return ResponseEntity.status(409).body(Map.of("error",
+                    request.isHardCopySubmissionRequired()
+                            ? "Hard-copy requirements must be received before marking this request ready for pickup"
+                            : "Only approved requests can be marked ready for pickup"));
         }
         request.setStatus("Ready for Pickup");
         request.setUpdatedAt(java.time.LocalDateTime.now());
@@ -292,6 +313,42 @@ public class SuperAdminController {
                 "Document Ready for Pickup",
                 "Your request for '" + request.getDocumentName() + "' is ready to claim at the barangay office.",
                 "REQUEST_READY_FOR_PICKUP",
+                null,
+                AdminNotificationService.TARGET_DOCUMENT_REQUEST,
+                savedRequest.getRequestId());
+
+        return ResponseEntity.ok(savedRequest);
+    }
+
+    @PutMapping("/requests/{id}/hard-copy-submitted")
+    public ResponseEntity<?> markHardCopySubmitted(@PathVariable Long id) {
+        DocumentRequest request = documentRequestRepository.findById(id).orElse(null);
+        if (request == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!request.isHardCopySubmissionRequired()) {
+            return ResponseEntity.status(409).body(Map.of("error", "This request does not require hard-copy submission"));
+        }
+        if (!request.getStatus().equals("Awaiting Hard Copy Submission")) {
+            return ResponseEntity.status(409).body(Map.of("error", "Only requests awaiting hard-copy submission can be updated"));
+        }
+
+        request.setStatus("Hard Copy Submitted");
+        request.setHardCopySubmittedAt(java.time.LocalDateTime.now());
+        request.setUpdatedAt(java.time.LocalDateTime.now());
+        DocumentRequest savedRequest = documentRequestRepository.save(request);
+
+        StatusLog statusLog = new StatusLog();
+        statusLog.setDocumentRequest(savedRequest);
+        statusLog.setStatus("Hard Copy Submitted");
+        statusLog.setTimestamp(java.time.LocalDateTime.now());
+        statusLogRepository.save(statusLog);
+
+        notificationService.createNotification(
+                request.getResident(),
+                "Hard Copy Requirements Received",
+                "The barangay office received the hard-copy requirements for '" + request.getDocumentName() + "'.",
+                "REQUEST_HARD_COPY_SUBMITTED",
                 null,
                 AdminNotificationService.TARGET_DOCUMENT_REQUEST,
                 savedRequest.getRequestId());
@@ -784,6 +841,10 @@ public class SuperAdminController {
 
     @PostMapping("/document-types")
     public ResponseEntity<?> addDocumentType(@RequestBody DocumentType type) {
+        String validationError = validateHardCopySettings(type);
+        if (validationError != null) {
+            return ResponseEntity.badRequest().body(Map.of("error", validationError));
+        }
         DocumentType saved = documentTypeRepository.save(type);
         return ResponseEntity.ok(saved);
     }
@@ -802,5 +863,41 @@ public class SuperAdminController {
         settings.put("barangayName", "Sample Barangay");
         settings.put("address", "Sample Address");
         return ResponseEntity.ok(settings);
+    }
+
+    private String validateHardCopySettings(DocumentType type) {
+        List<String> requirements = parseStoredList(type.getRequirements());
+        List<String> hardCopyRequirements = parseStoredList(type.getHardCopyRequirements());
+        if (!type.isHardCopySubmissionRequired()) {
+            type.setHardCopyRequirements("[]");
+            return null;
+        }
+        if (hardCopyRequirements.isEmpty()) {
+            return "At least one hard-copy requirement is required when hard-copy submission is enabled.";
+        }
+        if (!requirements.containsAll(hardCopyRequirements)) {
+            return "Hard-copy requirements must be selected from the existing document requirements.";
+        }
+        try {
+            type.setHardCopyRequirements(objectMapper.writeValueAsString(hardCopyRequirements));
+        } catch (Exception e) {
+            return "Unable to save hard-copy requirements.";
+        }
+        return null;
+    }
+
+    private List<String> parseStoredList(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<String> values = objectMapper.readValue(json, new TypeReference<List<String>>() {});
+            return values.stream()
+                    .filter(value -> value != null && !value.isBlank())
+                    .map(String::trim)
+                    .toList();
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 }

@@ -27,7 +27,7 @@ function RequestsList({ requests, onRequestClick }) {
               </div>
 
               <div className="min-w-0">
-                <h3 className="line-clamp-2 break-words text-lg font-extrabold leading-tight text-[#122361] [overflow-wrap:anywhere]">
+                <h3 className="font-[family-name:var(--font-montserrat)] line-clamp-2 break-words text-lg font-extrabold leading-tight text-[#122361] [overflow-wrap:anywhere]">
                   {request.documentName || 'Untitled Request'}
                 </h3>
                 <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">

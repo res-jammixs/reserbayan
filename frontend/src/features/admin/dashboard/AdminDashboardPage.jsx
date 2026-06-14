@@ -472,6 +472,33 @@ export default function AdminDashboardPage({
     }
   };
 
+  const handleHardCopySubmittedRequest = async (requestId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/requests/${requestId}/hard-copy-submitted`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        setIsRequestModalOpen(false);
+        setSelectedRequest(null);
+        setRequestDetails(null);
+        fetchDashboardData();
+        showNotification('Hard-copy requirements marked as received.', 'success');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        showNotification(errorData.message || 'Failed to mark hard-copy requirements received. Please try again.', 'error');
+      }
+    } catch (error) {
+      console.error('Error marking hard-copy requirements received:', error);
+      showNotification('Error connecting to server. Please check your internet connection.', 'error');
+    }
+  };
+
   const handleCompleteRequest = async (requestId) => {
     try {
       const token = localStorage.getItem('token');
@@ -559,6 +586,7 @@ export default function AdminDashboardPage({
         loading={requestModalLoading}
         onApprove={handleApproveRequest}
         onReject={handleRejectRequest}
+        onHardCopySubmitted={handleHardCopySubmittedRequest}
         onReadyForPickup={handleReadyForPickupRequest}
         onComplete={handleCompleteRequest}
       />

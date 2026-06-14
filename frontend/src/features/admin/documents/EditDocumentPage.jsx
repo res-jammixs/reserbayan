@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
@@ -19,19 +19,30 @@ export default function EditDocumentPage({ basePath = '/admin' }) {
       category: '',
       longDescription: '',
       processingTime: '',
-      pdfPath: '',
-      requirements: [],
-      uses: []
+          pdfPath: '',
+          requirements: [],
+          hardCopySubmissionRequired: false,
+          hardCopyRequirements: [],
+          uses: []
     }
   });
   const [generatedId, setGeneratedId] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [requirementsText, setRequirementsText] = useState('');
+  const [hardCopySubmissionRequired, setHardCopySubmissionRequired] = useState(false);
+  const [selectedHardCopyRequirements, setSelectedHardCopyRequirements] = useState([]);
   const [usesText, setUsesText] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [pdfFile, setPdfFile] = useState(null);
   const [notification, setNotification] = useState(null);
+
+  const requirements = useMemo(() => (
+    requirementsText
+      .split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  ), [requirementsText]);
 
   const uploadFile = async (file) => {
     if (!file) return null;
@@ -71,6 +82,8 @@ export default function EditDocumentPage({ basePath = '/admin' }) {
           processingTime: data.details?.processingTime || '',
           pdfPath: data.details?.pdfPath || '',
           requirements: data.details?.requirements || [],
+          hardCopySubmissionRequired: Boolean(data.details?.hardCopySubmissionRequired),
+          hardCopyRequirements: data.details?.hardCopyRequirements || [],
           uses: data.details?.uses || []
         }
       });
@@ -83,6 +96,8 @@ export default function EditDocumentPage({ basePath = '/admin' }) {
       setGeneratedId(initialSlug);
 
       setRequirementsText((data.details?.requirements || []).join('\n'));
+      setHardCopySubmissionRequired(Boolean(data.details?.hardCopySubmissionRequired));
+      setSelectedHardCopyRequirements(data.details?.hardCopyRequirements || []);
       setUsesText((data.details?.uses || []).join('\n'));
     } catch (err) {
       setNotification({
@@ -121,8 +136,18 @@ export default function EditDocumentPage({ basePath = '/admin' }) {
       const token = localStorage.getItem('token');
 
       // Parse requirements and uses
-      const requirements = requirementsText.split('\n').filter(item => item.trim());
+      const hardCopyRequirements = selectedHardCopyRequirements.filter((requirement) => requirements.includes(requirement));
       const uses = usesText.split('\n').filter(item => item.trim());
+
+      if (hardCopySubmissionRequired && hardCopyRequirements.length === 0) {
+        setNotification({
+          type: 'error',
+          title: 'Hard Copy Requirements Needed',
+          message: 'Add at least one hard-copy requirement or turn off hard-copy submission.',
+        });
+        setLoading(false);
+        return;
+      }
 
       const submitData = {
         ...formData,
@@ -132,6 +157,8 @@ export default function EditDocumentPage({ basePath = '/admin' }) {
           ...formData.details,
           pdfPath,
           requirements,
+          hardCopySubmissionRequired,
+          hardCopyRequirements: hardCopySubmissionRequired ? hardCopyRequirements : [],
           uses
         }
       };
@@ -185,6 +212,14 @@ export default function EditDocumentPage({ basePath = '/admin' }) {
         setGeneratedId(slug);
       }
     }
+  };
+
+  const toggleHardCopyRequirement = (requirement) => {
+    setSelectedHardCopyRequirements((currentRequirements) => (
+      currentRequirements.includes(requirement)
+        ? currentRequirements.filter((item) => item !== requirement)
+        : [...currentRequirements, requirement]
+    ));
   };
 
   if (fetchLoading) {
@@ -351,6 +386,45 @@ export default function EditDocumentPage({ basePath = '/admin' }) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2f84c0]"
                 placeholder="Valid ID&#10;Proof of residency&#10;Birth certificate"
               />
+            </div>
+
+            <div className="md:col-span-2 rounded-lg border border-[#d8def2] bg-[#eef3ff]/40 p-4">
+              <label className="flex items-center gap-3 text-sm font-bold text-[#122361]">
+                <input
+                  type="checkbox"
+                  checked={hardCopySubmissionRequired}
+                  onChange={(e) => setHardCopySubmissionRequired(e.target.checked)}
+                  className="h-4 w-4 accent-[#243b8e]"
+                />
+                Required for Hard Copy Submission
+              </label>
+              <p className="mt-1 text-xs font-medium text-gray-600">
+                Use this only for physical documents residents must bring to the barangay office.
+              </p>
+              {hardCopySubmissionRequired && (
+                requirements.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {requirements.map((requirement, index) => (
+                      <label
+                        key={`standalone-hard-copy-${requirement}-${index}`}
+                        className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 bg-white p-3 text-sm font-medium text-gray-700"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedHardCopyRequirements.includes(requirement)}
+                          onChange={() => toggleHardCopyRequirement(requirement)}
+                          className="mt-0.5 h-4 w-4 accent-[#243b8e]"
+                        />
+                        <span>{requirement}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">
+                    Add requirements first, then select which of them also require hard-copy submission.
+                  </p>
+                )
+              )}
             </div>
 
             <div className="md:col-span-2">

@@ -502,6 +502,8 @@ function StatusBadge({ status }) {
   const styles = {
     Pending: 'border-amber-200 bg-amber-50 text-amber-700',
     Approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    'Awaiting Hard Copy Submission': 'border-amber-200 bg-amber-50 text-amber-700',
+    'Hard Copy Submitted': 'border-[#c2cbea] bg-[#eef3ff] text-[#122361]',
     'Ready for Pickup': 'border-[#c2cbea] bg-[#eef3ff] text-[#122361]',
     Rejected: 'border-red-200 bg-red-50 text-red-700',
     Completed: 'border-green-200 bg-green-50 text-green-700',
@@ -553,7 +555,7 @@ function RequestsPanel({ requests, error, onViewRequest, onViewAllRequests }) {
                   {request.email && <p className="mt-0.5 text-xs font-medium text-slate-500">{request.email}</p>}
                 </td>
                 <td className="px-5 py-4">
-                  <p className="max-w-[220px] truncate font-bold text-slate-700">{request.documentName}</p>
+                  <p className="max-w-[220px] truncate font-[family-name:var(--font-montserrat)] font-bold text-slate-700">{request.documentName}</p>
                   {request.details && <p className="mt-0.5 max-w-[220px] truncate text-xs text-slate-400">{request.details}</p>}
                 </td>
                 <td className="px-5 py-4">

@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, ArrowRight, Calendar, FileText, Megaphone, PackageCheck, ShieldCheck, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Calendar, ClipboardCheck, FileText, Megaphone, PackageCheck, ShieldCheck, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 function formatDate(dateValue) {
@@ -68,6 +68,28 @@ function getRequestUpdateCopy(request) {
       badge: 'Ready for pick up',
       styles: 'border-emerald-200 bg-emerald-50 text-emerald-700',
       iconStyles: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+    };
+  }
+
+  if (status === 'awaiting-hard-copy-submission') {
+    return {
+      icon: FileText,
+      title: `${documentName} needs hard-copy requirements`,
+      detail: 'Please submit the required physical copies at the barangay office so staff can continue processing your request.',
+      badge: 'Hard copy needed',
+      styles: 'border-amber-200 bg-amber-50 text-amber-700',
+      iconStyles: 'bg-amber-50 text-amber-700 ring-amber-100',
+    };
+  }
+
+  if (status === 'hard-copy-submitted') {
+    return {
+      icon: ClipboardCheck,
+      title: `${documentName} hard copies were received`,
+      detail: 'The barangay office received your physical requirements and is preparing the document.',
+      badge: 'Received',
+      styles: 'border-[#c2cbea] bg-[#eef3ff] text-[#122361]',
+      iconStyles: 'bg-[#eef3ff] text-[#122361] ring-[#d8def2]',
     };
   }
 
@@ -163,7 +185,7 @@ export default function AnnouncementModal({ isOpen, announcement, requestUpdates
                   <div>
                     <p className="text-xs font-extrabold uppercase tracking-wide text-[#243b8e]">Request Updates</p>
                     <p className="mt-0.5 text-xs font-semibold text-slate-500">
-                      Active requests that are approved or ready to claim.
+                      Active requests that recently moved forward.
                     </p>
                   </div>
                   {onViewRequests && (

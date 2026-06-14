@@ -81,6 +81,13 @@ public class DataSeeder implements CommandLineRunner {
                             documentType.setRequirements(objectMapper.writeValueAsString(requirements));
                         }
 
+                        Object hardCopySubmissionRequired = details.get("hardCopySubmissionRequired");
+                        documentType.setHardCopySubmissionRequired(Boolean.parseBoolean(String.valueOf(hardCopySubmissionRequired)));
+                        @SuppressWarnings("unchecked")
+                        List<String> hardCopyRequirements = (List<String>) details.get("hardCopyRequirements");
+                        documentType.setHardCopyRequirements(objectMapper.writeValueAsString(
+                                hardCopyRequirements != null ? hardCopyRequirements : List.of()));
+
                         List<String> uses = (List<String>) details.get("uses");
                         if (uses != null) {
                             documentType.setUses(objectMapper.writeValueAsString(uses));
