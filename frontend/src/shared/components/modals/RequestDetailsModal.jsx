@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, User, FileText, Calendar, Clock, Paperclip, Download, CheckCircle, XCircle, PackageCheck, ClipboardCheck, ClipboardList, Mail, Phone, MapPin } from 'lucide-react';
-import AiReviewPanel from '@/shared/components/ai/AiReviewPanel';
+import AiReviewAssistant from '@/shared/components/ai/AiReviewAssistant';
 import NotificationModal from '@/app/components/NotificationModal';
 import RequestProgressTracker from '@/app/components/requests/RequestProgressTracker';
 
@@ -122,6 +122,10 @@ export default function RequestDetailsModal({
 
   if (!isOpen || !requestDetails) return null;
   const normalizedStatus = requestDetails.status?.toLowerCase().replace(/[\s_-]+/g, '-') || '';
+  const footerButtonBase = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-bold shadow-sm transition-colors';
+  const footerButtonGhost = `${footerButtonBase} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`;
+  const footerButtonDanger = `${footerButtonBase} border border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100`;
+  const footerButtonPrimary = `${footerButtonBase} bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white hover:from-[#122361] hover:to-[#2f84c0]`;
   const residentName = requestDetails.resident
     || requestDetails.residentName
     || requestDetails.residentFullName
@@ -414,29 +418,33 @@ export default function RequestDetailsModal({
                 </div>
               </div>
 
-              <AiReviewPanel requestId={requestDetails.id || requestDetails.requestId} />
             </div>
           )}
         </div>
 
         {/* Footer Actions */}
         {!loading && (
-          <div className="sticky bottom-0 z-20 flex shrink-0 gap-3 border-t border-slate-200 bg-slate-50/95 px-6 py-4 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="sticky bottom-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/95 px-6 py-4 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
             {/* Action buttons based on status */}
+            <div className="flex min-w-0 flex-1 justify-start">
+              <AiReviewAssistant requestId={requestDetails.id || requestDetails.requestId} />
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
             {normalizedStatus === 'pending' && (
               <>
                 <button
                   onClick={() => onReject(requestDetails.id || requestDetails.requestId)}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium border border-red-200 bg-red-50 text-red-700 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100"
+                  className={footerButtonDanger}
                 >
-                  <XCircle className="w-5 h-5" />
+                  <XCircle className="w-3.5 h-3.5" />
                   Reject Request
                 </button>
                 <button
                   onClick={() => onApprove(requestDetails.id || requestDetails.requestId)}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0]"
+                  className={footerButtonPrimary}
                 >
-                  <CheckCircle className="w-5 h-5" />
+                  <CheckCircle className="w-3.5 h-3.5" />
                   Approve Request
                 </button>
               </>
@@ -444,37 +452,38 @@ export default function RequestDetailsModal({
             {normalizedStatus === 'awaiting-hard-copy-submission' && onHardCopySubmitted && (
               <button
                 onClick={() => onHardCopySubmitted(requestDetails.id || requestDetails.requestId)}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0]"
+                className={footerButtonPrimary}
               >
-                <ClipboardCheck className="w-5 h-5" />
+                <ClipboardCheck className="w-3.5 h-3.5" />
                 Mark Hard Copy Received
               </button>
             )}
             {(normalizedStatus === 'approved' || normalizedStatus === 'hard-copy-submitted') && onReadyForPickup && (
               <button
                 onClick={() => onReadyForPickup(requestDetails.id || requestDetails.requestId)}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0]"
+                className={footerButtonPrimary}
               >
-                <PackageCheck className="w-5 h-5" />
+                <PackageCheck className="w-3.5 h-3.5" />
                 Mark Ready for Pick Up
               </button>
             )}
             {normalizedStatus === 'ready-for-pickup' && onComplete && (
               <button
                 onClick={() => onComplete(requestDetails.id || requestDetails.requestId)}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0]"
+                className={footerButtonPrimary}
               >
-                <CheckCircle className="w-5 h-5" />
+                <CheckCircle className="w-3.5 h-3.5" />
                 Mark as Completed
               </button>
             )}
             <button
               onClick={onClose}
-              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-slate-300 bg-white font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+              className={footerButtonGhost}
             >
-              <XCircle className="w-5 h-5" />
+              <XCircle className="w-3.5 h-3.5" />
               Close
             </button>
+            </div>
           </div>
         )}
       </motion.div>
