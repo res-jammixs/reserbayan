@@ -3,7 +3,7 @@ import { Ban, FileText, Calendar, XCircle, Paperclip, Edit2, Save, Trash2, Plus,
 import NotificationModal from '@/app/components/NotificationModal';
 import ConfirmationModal from '@/shared/components/modals/ConfirmationModal';
 import RejectionReasonModal from '@/shared/components/modals/RejectionReasonModal';
-import AiReviewPanel from '@/shared/components/ai/AiReviewPanel';
+import AiReviewAssistant from '@/shared/components/ai/AiReviewAssistant';
 import RequestProgressTracker from './RequestProgressTracker';
 import { motion } from 'framer-motion';
 
@@ -36,6 +36,10 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
 
   if (!displayRequest) return null;
   const normalizedStatus = displayRequest.status?.toLowerCase().replace(/[\s_-]+/g, '-') || '';
+  const footerButtonBase = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-bold shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-70';
+  const footerButtonGhost = `${footerButtonBase} border border-gray-300 bg-white text-gray-700 hover:bg-gray-50`;
+  const footerButtonDanger = `${footerButtonBase} border border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100`;
+  const footerButtonPrimary = `${footerButtonBase} bg-gradient-to-r from-[#243b8e] to-[#2f84c0] text-white hover:from-[#122361] hover:to-[#2f84c0]`;
 
   // --- HELPERS ---
   const residentFullName = displayRequest.residentName
@@ -788,15 +792,12 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
             </div>
           </div>
 
-          {!isEditing && user === null && (
-            <AiReviewPanel requestId={displayRequest.requestId} />
-          )}
         </div>
 
-        <div className="sticky bottom-0 z-20 flex shrink-0 justify-end gap-3 rounded-b-2xl border-t border-gray-200 bg-gray-50/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:p-4">
+        <div className="sticky bottom-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-b-2xl border-t border-gray-200 bg-gray-50/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:p-4">
           
           {isEditing ? (
-             <>
+             <div className="ml-auto flex flex-wrap justify-end gap-2">
                 <button
                     onClick={() => {
                         setIsEditing(false);
@@ -804,27 +805,34 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                         setNewFiles([]);
                         setFilesToRemove([]);
                     }}
-                    className="rounded-lg border border-gray-300 bg-white px-5 py-2 font-medium text-gray-700 hover:bg-gray-50"
+                    className={footerButtonGhost}
                     disabled={isSaving}
                 >
                     Cancel Edit
                 </button>
                 <button
                     onClick={handleSaveChanges}
-                    className="flex items-center gap-2 rounded-lg bg-[#243b8e] px-5 py-2 font-medium text-white hover:bg-[#122361]"
+                    className={footerButtonPrimary}
                     disabled={isSaving}
                 >
-                    {isSaving ? 'Saving...' : <><Save className="w-4 h-4" /> Save Changes</>}
+                    {isSaving ? 'Saving...' : <><Save className="w-3.5 h-3.5" /> Save Changes</>}
                 </button>
-             </>
+             </div>
           ) : (
              <>
+                 <div className="flex min-w-0 flex-1 justify-start">
+                    {user === null && (
+                       <AiReviewAssistant requestId={displayRequest.requestId} />
+                    )}
+                 </div>
+
+                 <div className="flex flex-wrap justify-end gap-2">
                  {user !== null && ['cancelled', 'rejected'].includes(displayRequest.status?.toLowerCase()) && ( 
                      <button
                         onClick={handleReRequest}
-                        className="flex items-center gap-2 rounded-lg bg-[#243b8e] px-5 py-2 font-medium text-white shadow-sm transition-colors hover:bg-[#122361]"
+                        className={footerButtonPrimary}
                      >
-                        <RotateCcw className="w-4 h-4" /> Re-Request
+                        <RotateCcw className="w-3.5 h-3.5" /> Re-Request
                      </button>
                  )}
 
@@ -832,16 +840,16 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                     <>
                     <button
                         onClick={handleRejectRequest}
-                        className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-5 py-2 font-medium text-red-700 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100"
+                        className={footerButtonDanger}
                     >
-                        <XCircle className="h-4 w-4" aria-hidden="true" />
+                        <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
                         Reject Request
                     </button>
                     <button
                         onClick={handleApproveRequest}
-                        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#243b8e] to-[#2f84c0] px-5 py-2 font-medium text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0]"
+                        className={footerButtonPrimary}
                     >
-                        <CheckCircle className="h-4 w-4" aria-hidden="true" />
+                        <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
                         Approve Request
                     </button>
                     </>
@@ -851,9 +859,9 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                     <button
                         onClick={handleHardCopySubmittedRequest}
                         disabled={isMarkingHardCopy}
-                        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#243b8e] to-[#2f84c0] px-5 py-2 font-medium text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0] disabled:cursor-not-allowed disabled:opacity-70"
+                        className={footerButtonPrimary}
                     >
-                        <ClipboardCheck className="w-4 h-4" />
+                        <ClipboardCheck className="w-3.5 h-3.5" />
                         {isMarkingHardCopy ? 'Updating...' : 'Mark Hard Copy Received'}
                     </button>
                  )}
@@ -862,9 +870,9 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                     <button
                         onClick={handleReadyForPickupRequest}
                         disabled={isMarkingReady}
-                        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#243b8e] to-[#2f84c0] px-5 py-2 font-medium text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0] disabled:cursor-not-allowed disabled:opacity-70"
+                        className={footerButtonPrimary}
                     >
-                        <PackageCheck className="w-4 h-4" />
+                        <PackageCheck className="w-3.5 h-3.5" />
                         {isMarkingReady ? 'Updating...' : 'Mark Ready for Pick Up'}
                     </button>
                  )}
@@ -873,9 +881,9 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                     <button
                         onClick={handleCompleteRequest}
                         disabled={isCompleting}
-                        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#243b8e] to-[#2f84c0] px-5 py-2 font-medium text-white shadow-sm transition-colors hover:from-[#122361] hover:to-[#2f84c0] disabled:cursor-not-allowed disabled:opacity-70"
+                        className={footerButtonPrimary}
                     >
-                        <CheckCircle className="w-4 h-4" />
+                        <CheckCircle className="w-3.5 h-3.5" />
                         {isCompleting ? 'Completing...' : 'Mark as Completed'}
                     </button>
                  )}
@@ -883,20 +891,21 @@ function RequestModal({ request, user, onClose, cancelRequest, completeRequest, 
                  {user !== null && normalizedStatus === 'pending' && (
                     <button
                     onClick={handleCancelRequest}
-                    className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-5 py-2 font-medium text-red-700 shadow-sm transition-colors hover:border-red-300 hover:bg-red-100"
+                    className={footerButtonDanger}
                     >
-                    <Ban className="h-4 w-4" aria-hidden="true" />
+                    <Ban className="h-3.5 w-3.5" aria-hidden="true" />
                     Cancel Request
                     </button>
                  )}
 
-                 <button
-                    onClick={onClose}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2 font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-                 >
-                    <XCircle className="h-4 w-4" aria-hidden="true" />
-                    Close
-                 </button>
+                  <button
+                     onClick={onClose}
+                     className={footerButtonGhost}
+                  >
+                     <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                     Close
+                  </button>
+                 </div>
              </>
           )}
         </div>
